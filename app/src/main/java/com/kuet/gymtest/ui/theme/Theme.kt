@@ -1,58 +1,41 @@
 package com.kuet.gymtest.ui.theme
 
-import android.app.Activity
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
+// Blue family: structure (headers, tags, back buttons)
+val LightBlue = Color(0xFFD9EDF8)
+val DeepBlue = Color(0xFF18506F)
 
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+// Green family: actions (buttons, progress)
+val LightGreen = Color(0xFFD5F0DF)
+val DeepGreen = Color(0xFF17583A)
 
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+private val AppColors = lightColorScheme(
+    primary = DeepBlue,
     onPrimary = Color.White,
+    primaryContainer = LightBlue,
+    onPrimaryContainer = DeepBlue,
+    secondary = DeepGreen,
     onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    secondaryContainer = LightGreen,
+    onSecondaryContainer = DeepGreen,
+    background = Color(0xFFF6FAFB),
+    onBackground = Color(0xFF14272F),
+    surface = Color.White,
+    onSurface = Color(0xFF14272F),
+    surfaceVariant = Color(0xFFEDF3F5),
+    onSurfaceVariant = Color(0xFF53656C),
+    outline = Color(0xFFBCCFD5)
 )
 
 @Composable
-fun GymTestTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
-) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
+fun GymTestTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
+        colorScheme = AppColors,
+        typography = AppTypography,
         content = content
     )
 }

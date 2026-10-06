@@ -197,14 +197,24 @@ object RecommendationEngine {
         )
     )
 
+    private val levelRank = mapOf("Beginner" to 0, "Intermediate" to 1, "Advanced" to 2)
+
     fun recommend(profile: UserProfile): List<Exercise> {
+        val userLevel = levelRank[profile.fitnessLevel] ?: 0
 
-        return exercises.filter { exercise ->
-
-            exercise.goal == profile.goal &&
-                    exercise.level == profile.fitnessLevel &&
-                    exercise.equipment == profile.equipment
-        }
+        return exercises
+            .filter {
+                it.goal == profile.goal &&
+                        (levelRank[it.level] ?: 0) <= userLevel &&
+                        (it.equipment == "No Equipment" || it.equipment == profile.equipment)
+            }
+            .sortedWith(
+                compareByDescending<Exercise> {
+                    it.equipment == profile.equipment && it.equipment != "No Equipment"
+                }
+                    .thenByDescending { levelRank[it.level] ?: 0 }
+                    .thenBy { it.muscleGroup }
+            )
     }
 
     fun getAllExercises(): List<Exercise> {
