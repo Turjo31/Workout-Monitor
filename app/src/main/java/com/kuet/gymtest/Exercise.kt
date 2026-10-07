@@ -10,5 +10,6 @@ data class Exercise(
     val description: String,
     val instructions: List<String>,
     val defaultSets: Int,
-    val defaultReps: Int
+    val defaultReps: Int,
+    val lowImpact: Boolean = false
 )

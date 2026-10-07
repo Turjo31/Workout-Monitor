@@ -2,222 +2,225 @@ package com.kuet.gymtest
 
 object RecommendationEngine {
 
-    private val exercises = listOf(
+    private const val NONE = "No Equipment"
+    private const val DB = "Dumbbells"
+    private const val MG = "Muscle Gain"
+    private const val WL = "Weight Loss"
 
-        // =========================
-        // MUSCLE GAIN - BEGINNER
-        // =========================
-
-        Exercise(
-            name = "Bodyweight Squat",
-            goal = "Muscle Gain",
-            level = "Beginner",
-            equipment = "No Equipment",
-            muscleGroup = "Legs",
-            category = "Strength",
-            description = "A fundamental lower-body exercise targeting the quadriceps, glutes and hamstrings.",
-            instructions = listOf(
-                "Stand with your feet approximately shoulder-width apart.",
-                "Keep your chest up and your back neutral.",
-                "Bend your knees and lower your hips.",
-                "Push through your feet to return to the starting position."
-            ),
-            defaultSets = 3,
-            defaultReps = 12
-        ),
-
-        Exercise(
-            name = "Push-up",
-            goal = "Muscle Gain",
-            level = "Beginner",
-            equipment = "No Equipment",
-            muscleGroup = "Chest",
-            category = "Strength",
-            description = "A bodyweight pushing exercise targeting the chest, shoulders and triceps.",
-            instructions = listOf(
-                "Place your hands slightly wider than shoulder width.",
-                "Keep your body in a straight line.",
-                "Lower your chest toward the floor.",
-                "Push back up while keeping your body straight."
-            ),
-            defaultSets = 3,
-            defaultReps = 10
-        ),
-
-        Exercise(
-            name = "Glute Bridge",
-            goal = "Muscle Gain",
-            level = "Beginner",
-            equipment = "No Equipment",
-            muscleGroup = "Glutes",
-            category = "Strength",
-            description = "A lower-body exercise focused primarily on the glutes.",
-            instructions = listOf(
-                "Lie on your back with your knees bent.",
-                "Keep your feet flat on the floor.",
-                "Raise your hips while squeezing your glutes.",
-                "Lower your hips under control."
-            ),
-            defaultSets = 3,
-            defaultReps = 15
-        ),
-
-        Exercise(
-            name = "Plank",
-            goal = "Muscle Gain",
-            level = "Beginner",
-            equipment = "No Equipment",
-            muscleGroup = "Core",
-            category = "Core",
-            description = "An isometric exercise that develops core stability.",
-            instructions = listOf(
-                "Place your forearms on the floor.",
-                "Extend your legs behind you.",
-                "Keep your body in a straight line.",
-                "Hold the position while maintaining controlled breathing."
-            ),
-            defaultSets = 3,
-            defaultReps = 30
-        ),
-
-        // =========================
-        // MUSCLE GAIN - DUMBBELLS
-        // =========================
-
-        Exercise(
-            name = "Dumbbell Curl",
-            goal = "Muscle Gain",
-            level = "Beginner",
-            equipment = "Dumbbells",
-            muscleGroup = "Biceps",
-            category = "Strength",
-            description = "An isolation exercise targeting the biceps.",
-            instructions = listOf(
-                "Stand upright while holding a dumbbell in each hand.",
-                "Keep your elbows close to your body.",
-                "Curl the weights toward your shoulders.",
-                "Lower the weights slowly."
-            ),
-            defaultSets = 3,
-            defaultReps = 12
-        ),
-
-        Exercise(
-            name = "Dumbbell Shoulder Press",
-            goal = "Muscle Gain",
-            level = "Intermediate",
-            equipment = "Dumbbells",
-            muscleGroup = "Shoulders",
-            category = "Strength",
-            description = "A pressing movement that primarily targets the shoulders.",
-            instructions = listOf(
-                "Hold the dumbbells at shoulder height.",
-                "Keep your core stable.",
-                "Press the dumbbells overhead.",
-                "Lower them slowly back to shoulder height."
-            ),
-            defaultSets = 3,
-            defaultReps = 10
-        ),
-
-        Exercise(
-            name = "Dumbbell Row",
-            goal = "Muscle Gain",
-            level = "Intermediate",
-            equipment = "Dumbbells",
-            muscleGroup = "Back",
-            category = "Strength",
-            description = "A pulling exercise that targets the upper back and arms.",
-            instructions = listOf(
-                "Hold a dumbbell in each hand.",
-                "Hinge forward while keeping your back neutral.",
-                "Pull the dumbbells toward your torso.",
-                "Lower them under control."
-            ),
-            defaultSets = 3,
-            defaultReps = 10
-        ),
-
-        // =========================
-        // WEIGHT LOSS
-        // =========================
-
-        Exercise(
-            name = "Jumping Jacks",
-            goal = "Weight Loss",
-            level = "Beginner",
-            equipment = "No Equipment",
-            muscleGroup = "Full Body",
-            category = "Cardio",
-            description = "A simple full-body cardio exercise that increases heart rate.",
-            instructions = listOf(
-                "Stand upright with your feet together.",
-                "Jump while moving your feet apart.",
-                "Raise your arms overhead.",
-                "Return to the starting position."
-            ),
-            defaultSets = 3,
-            defaultReps = 20
-        ),
-
-        Exercise(
-            name = "High Knees",
-            goal = "Weight Loss",
-            level = "Beginner",
-            equipment = "No Equipment",
-            muscleGroup = "Full Body",
-            category = "Cardio",
-            description = "A cardio movement involving alternating high knee drives.",
-            instructions = listOf(
-                "Stand upright.",
-                "Drive one knee toward your chest.",
-                "Lower it while raising the opposite knee.",
-                "Continue alternating at a controlled pace."
-            ),
-            defaultSets = 3,
-            defaultReps = 20
-        ),
-
-        Exercise(
-            name = "Lunges",
-            goal = "Weight Loss",
-            level = "Beginner",
-            equipment = "No Equipment",
-            muscleGroup = "Legs",
-            category = "Cardio",
-            description = "A lower-body movement that also challenges balance and coordination.",
-            instructions = listOf(
-                "Stand upright with your feet together.",
-                "Step forward with one leg.",
-                "Lower your body under control.",
-                "Push through the front foot to return."
-            ),
-            defaultSets = 3,
-            defaultReps = 10
-        )
+    private fun ex(
+        name: String, goal: String, level: String, equipment: String,
+        muscle: String, category: String, desc: String,
+        sets: Int, reps: Int, lowImpact: Boolean,
+        vararg steps: String
+    ) = Exercise(
+        name = name, goal = goal, level = level, equipment = equipment,
+        muscleGroup = muscle, category = category, description = desc,
+        instructions = steps.toList(), defaultSets = sets, defaultReps = reps,
+        lowImpact = lowImpact
     )
 
-    private val levelRank = mapOf("Beginner" to 0, "Intermediate" to 1, "Advanced" to 2)
+    private val exercises = listOf(
+
+        // ---------- MUSCLE GAIN: NO EQUIPMENT ----------
+        ex("Bodyweight Squat", MG, "Beginner", NONE, "Legs", "Strength",
+            "A fundamental lower-body exercise for quads, glutes and hamstrings.", 3, 12, true,
+            "Stand with feet shoulder-width apart.",
+            "Keep your chest up and back neutral.",
+            "Lower your hips by bending your knees.",
+            "Push through your feet to stand."),
+        ex("Push-up", MG, "Beginner", NONE, "Chest", "Strength",
+            "A bodyweight push targeting chest, shoulders and triceps.", 3, 10, false,
+            "Place hands slightly wider than shoulders.",
+            "Keep your body in a straight line.",
+            "Lower your chest toward the floor.",
+            "Push back up."),
+        ex("Wall Push-up", MG, "Beginner", NONE, "Chest", "Strength",
+            "A gentle push-up variation done standing against a wall.", 3, 12, true,
+            "Stand an arm's length from a wall.",
+            "Place your palms on the wall at chest height.",
+            "Bend your elbows to bring your chest close.",
+            "Push back to the start."),
+        ex("Glute Bridge", MG, "Beginner", NONE, "Glutes", "Strength",
+            "A lower-body exercise focused on the glutes.", 3, 15, true,
+            "Lie on your back with knees bent.",
+            "Keep feet flat on the floor.",
+            "Raise your hips while squeezing your glutes.",
+            "Lower under control."),
+        ex("Plank", MG, "Beginner", NONE, "Core", "Core",
+            "An isometric hold that builds core stability (reps = seconds).", 3, 30, true,
+            "Place forearms on the floor.",
+            "Extend your legs behind you.",
+            "Keep your body in a straight line.",
+            "Hold while breathing steadily."),
+        ex("Superman", MG, "Beginner", NONE, "Back", "Strength",
+            "A floor exercise strengthening the lower back and glutes.", 3, 12, true,
+            "Lie face down with arms extended forward.",
+            "Lift your arms, chest and legs slightly.",
+            "Hold for one second.",
+            "Lower slowly."),
+        ex("Pike Push-up", MG, "Intermediate", NONE, "Shoulders", "Strength",
+            "A push-up with hips raised to target the shoulders.", 3, 8, false,
+            "Start in a downward-dog position.",
+            "Bend your elbows to lower your head toward the floor.",
+            "Press back up to the start."),
+        ex("Split Squat", MG, "Intermediate", NONE, "Legs", "Strength",
+            "A single-leg-focused squat that builds strength and balance.", 3, 10, true,
+            "Step one foot forward into a long stance.",
+            "Lower your back knee toward the floor.",
+            "Drive through the front heel to rise."),
+        ex("Diamond Push-up", MG, "Advanced", NONE, "Triceps", "Strength",
+            "A close-hand push-up emphasizing the triceps.", 3, 8, false,
+            "Form a diamond with your hands under your chest.",
+            "Keep elbows close to your body.",
+            "Lower and press back up."),
+        ex("Pistol Squat", MG, "Advanced", NONE, "Legs", "Strength",
+            "A single-leg squat requiring strength, balance and mobility.", 3, 5, false,
+            "Stand on one leg with the other extended forward.",
+            "Lower into a deep squat.",
+            "Drive up through your heel."),
+
+        // ---------- MUSCLE GAIN: DUMBBELLS ----------
+        ex("Dumbbell Curl", MG, "Beginner", DB, "Biceps", "Strength",
+            "An isolation exercise targeting the biceps.", 3, 12, true,
+            "Stand holding a dumbbell in each hand.",
+            "Keep elbows close to your body.",
+            "Curl the weights to your shoulders.",
+            "Lower slowly."),
+        ex("Goblet Squat", MG, "Beginner", DB, "Legs", "Strength",
+            "A squat holding one dumbbell at the chest.", 3, 12, true,
+            "Hold a dumbbell vertically at your chest.",
+            "Squat down keeping your chest tall.",
+            "Stand back up."),
+        ex("Dumbbell Shoulder Press", MG, "Intermediate", DB, "Shoulders", "Strength",
+            "A pressing movement targeting the shoulders.", 3, 10, true,
+            "Hold dumbbells at shoulder height.",
+            "Brace your core.",
+            "Press overhead, then lower slowly."),
+        ex("Dumbbell Row", MG, "Intermediate", DB, "Back", "Strength",
+            "A pulling exercise for the upper back and arms.", 3, 10, true,
+            "Hold dumbbells and hinge forward with a neutral back.",
+            "Pull the weights toward your torso.",
+            "Lower under control."),
+        ex("Dumbbell Floor Press", MG, "Intermediate", DB, "Chest", "Strength",
+            "A chest press performed lying on the floor.", 3, 10, true,
+            "Lie on your back holding dumbbells above your chest.",
+            "Lower until your upper arms touch the floor.",
+            "Press back up."),
+        ex("Romanian Deadlift", MG, "Intermediate", DB, "Hamstrings", "Strength",
+            "A hip-hinge targeting hamstrings and glutes.", 3, 10, true,
+            "Hold dumbbells in front of your thighs.",
+            "Push your hips back with a flat back.",
+            "Stand tall by driving your hips forward."),
+        ex("Dumbbell Lunge", MG, "Intermediate", DB, "Legs", "Strength",
+            "A weighted lunge for legs and glutes.", 3, 10, true,
+            "Hold dumbbells at your sides.",
+            "Step forward and lower your back knee.",
+            "Push back to the start."),
+        ex("Dumbbell Thruster", MG, "Advanced", DB, "Full Body", "Strength",
+            "A squat into an overhead press in one movement.", 3, 8, false,
+            "Hold dumbbells at your shoulders.",
+            "Squat down, then drive up.",
+            "Press the weights overhead as you stand."),
+        ex("Renegade Row", MG, "Advanced", DB, "Back", "Strength",
+            "A plank-position row that challenges back and core.", 3, 8, false,
+            "Start in a push-up position on the dumbbells.",
+            "Row one dumbbell to your hip.",
+            "Lower and alternate sides."),
+
+        // ---------- WEIGHT LOSS: NO EQUIPMENT ----------
+        ex("Marching in Place", WL, "Beginner", NONE, "Full Body", "Cardio",
+            "A low-impact cardio warm-up that raises your heart rate.", 3, 40, true,
+            "Stand tall.",
+            "Lift your knees alternately at a steady pace.",
+            "Swing your arms naturally."),
+        ex("Shadow Boxing", WL, "Beginner", NONE, "Full Body", "Cardio",
+            "Light punching combos for low-impact cardio.", 3, 30, true,
+            "Stand in a staggered stance.",
+            "Throw alternating punches.",
+            "Keep your core tight and move your feet lightly."),
+        ex("Jumping Jacks", WL, "Beginner", NONE, "Full Body", "Cardio",
+            "A simple full-body cardio exercise.", 3, 20, false,
+            "Stand with feet together.",
+            "Jump feet apart while raising arms overhead.",
+            "Return to the start."),
+        ex("High Knees", WL, "Beginner", NONE, "Full Body", "Cardio",
+            "Alternating high knee drives to raise your heart rate.", 3, 20, false,
+            "Stand upright.",
+            "Drive one knee toward your chest.",
+            "Alternate quickly and stay light on your feet."),
+        ex("Lunges", WL, "Beginner", NONE, "Legs", "Cardio",
+            "A lower-body movement that challenges balance.", 3, 10, true,
+            "Stand with feet together.",
+            "Step forward and lower your body.",
+            "Push through the front foot to return."),
+        ex("Mountain Climbers", WL, "Intermediate", NONE, "Core", "Cardio",
+            "A plank-position cardio move.", 3, 20, false,
+            "Start in a high plank.",
+            "Drive your knees toward your chest alternately.",
+            "Keep your hips low."),
+        ex("Burpees", WL, "Intermediate", NONE, "Full Body", "Cardio",
+            "A high-intensity full-body movement.", 3, 8, false,
+            "Squat and place hands on the floor.",
+            "Jump your feet back to a plank.",
+            "Jump feet forward and leap up."),
+        ex("Squat Jumps", WL, "Advanced", NONE, "Legs", "Cardio",
+            "An explosive squat that boosts heart rate.", 3, 12, false,
+            "Lower into a squat.",
+            "Explode upward into a jump.",
+            "Land softly and repeat."),
+        ex("Tuck Jumps", WL, "Advanced", NONE, "Full Body", "Cardio",
+            "A powerful jump bringing knees toward the chest.", 3, 10, false,
+            "Stand with feet hip-width apart.",
+            "Jump and pull your knees up.",
+            "Land softly."),
+
+        // ---------- WEIGHT LOSS: DUMBBELLS ----------
+        ex("Dumbbell Squat to Press", WL, "Beginner", DB, "Full Body", "Cardio",
+            "A light full-body combo to keep your heart rate up.", 3, 12, true,
+            "Hold dumbbells at your shoulders.",
+            "Squat down.",
+            "Stand and press the weights overhead."),
+        ex("Dumbbell Swing", WL, "Advanced", DB, "Full Body", "Cardio",
+            "A powerful hip-driven swing with one dumbbell.", 3, 15, false,
+            "Hold one dumbbell with both hands.",
+            "Hinge and swing it between your legs.",
+            "Drive your hips forward to swing it to chest height.")
+    )
+
+    private fun rank(level: String) = when (level) {
+        "Beginner" -> 0
+        "Intermediate" -> 1
+        "Advanced" -> 2
+        else -> 0
+    }
 
     fun recommend(profile: UserProfile): List<Exercise> {
-        val userLevel = levelRank[profile.fitnessLevel] ?: 0
+        val userLevel = rank(profile.fitnessLevel)
 
-        return exercises
-            .filter {
-                it.goal == profile.goal &&
-                        (levelRank[it.level] ?: 0) <= userLevel &&
-                        (it.equipment == "No Equipment" || it.equipment == profile.equipment)
-            }
-            .sortedWith(
-                compareByDescending<Exercise> {
-                    it.equipment == profile.equipment && it.equipment != "No Equipment"
-                }
-                    .thenByDescending { levelRank[it.level] ?: 0 }
-                    .thenBy { it.muscleGroup }
-            )
+        val eligible = exercises.filter {
+            it.goal == profile.goal &&
+                    rank(it.level) <= userLevel &&
+                    (it.equipment == NONE || it.equipment == profile.equipment) &&
+                    (profile.age < 50 || it.lowImpact)
+        }
+
+        val ranked = eligible.sortedWith(
+            compareByDescending<Exercise> { rank(it.level) }
+                .thenByDescending { it.equipment == profile.equipment && it.equipment != NONE }
+        )
+
+        return interleave(ranked).take(8)
     }
 
-    fun getAllExercises(): List<Exercise> {
-        return exercises
+    // Mix muscle groups so the list isn't all legs, then all chest, etc.
+    private fun interleave(list: List<Exercise>): List<Exercise> {
+        val groups = list.groupBy { it.muscleGroup }.values.map { it.toMutableList() }
+        val out = mutableListOf<Exercise>()
+        while (groups.any { it.isNotEmpty() }) {
+            groups.forEach { if (it.isNotEmpty()) out += it.removeAt(0) }
+        }
+        return out
     }
+
+    fun getAllExercises(): List<Exercise> = exercises
 }

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -62,15 +61,15 @@ fun ProfileScreen(
                 .fillMaxWidth()
                 .background(LightBlue)
                 .statusBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 32.dp)
+                .padding(horizontal = 24.dp, vertical = 24.dp)
         ) {
             Text(
-                "Let's build your plan",
+                "Profile",
                 color = DeepBlue,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 "Tell us a bit about yourself",
                 color = DeepBlue.copy(alpha = 0.8f),
@@ -79,9 +78,7 @@ fun ProfileScreen(
         }
 
         Column(
-            modifier = Modifier
-                .padding(20.dp)
-                .navigationBarsPadding(),
+            modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             OutlinedTextField(
@@ -113,7 +110,7 @@ fun ProfileScreen(
                     disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             ) {
-                Text("Get recommendations", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("Save & get plan", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

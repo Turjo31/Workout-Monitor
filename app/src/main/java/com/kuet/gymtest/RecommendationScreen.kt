@@ -6,15 +6,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -23,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.PlayArrow
@@ -32,7 +27,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kuet.gymtest.ui.theme.DeepBlue
@@ -54,11 +49,13 @@ import com.kuet.gymtest.ui.theme.LightGreen
 
 @Composable
 fun RecommendationScreen(
-    profile: UserProfile,
-    onBack: () -> Unit,
+    profile: UserProfile?,
+    onSetupProfile: () -> Unit,
     onStart: (Exercise) -> Unit
 ) {
-    val exercises = remember(profile) { RecommendationEngine.recommend(profile) }
+    val exercises = remember(profile) {
+        profile?.let { RecommendationEngine.recommend(it) } ?: emptyList()
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -66,22 +63,15 @@ fun RecommendationScreen(
                 .fillMaxWidth()
                 .background(LightBlue)
                 .statusBarsPadding()
-                .padding(start = 8.dp, end = 20.dp, top = 12.dp, bottom = 24.dp)
+                .padding(horizontal = 24.dp, vertical = 24.dp)
         ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Edit profile",
-                    tint = DeepBlue
-                )
-            }
-            Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text(
-                    "Your workout",
-                    color = DeepBlue,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            Text(
+                "Your plan",
+                color = DeepBlue,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold
+            )
+            if (profile != null) {
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     HeaderTag(profile.goal)
@@ -91,32 +81,56 @@ fun RecommendationScreen(
             }
         }
 
-        if (exercises.isEmpty()) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "No exercises match this profile yet.\nTry a different level or equipment.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 15.sp
-                )
-            }
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 16.dp,
-                    bottom = 16.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                ),
+        when {
+            profile == null -> EmptyState(
+                message = "Set up your profile to get a personalized plan.",
+                buttonText = "Set up profile",
+                onClick = onSetupProfile
+            )
+
+            exercises.isEmpty() -> EmptyState(
+                message = "No exercises match this profile yet.\nTry a different level or equipment.",
+                buttonText = "Edit profile",
+                onClick = onSetupProfile
+            )
+
+            else -> LazyColumn(
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(exercises, key = { it.name }) { exercise ->
                     ExerciseCard(exercise, onStart = { onStart(exercise) })
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyState(message: String, buttonText: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                message,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 15.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onClick,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = LightGreen,
+                    contentColor = DeepGreen
+                )
+            ) {
+                Text(buttonText, fontWeight = FontWeight.Bold)
             }
         }
     }
