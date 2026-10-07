@@ -63,65 +63,84 @@ fun AppNavigation() {
     var tab by remember { mutableStateOf(Tab.Home) }
     var profile by remember { mutableStateOf<UserProfile?>(null) }
     var activeExercise by remember { mutableStateOf<Exercise?>(null) }
+    var history by remember { mutableStateOf(listOf<WorkoutRecord>()) }
 
+    val currentProfile = profile
     val exercise = activeExercise
 
-    if (exercise != null) {
-        BackHandler { activeExercise = null }
-        WorkoutSessionScreen(
-            exercise = exercise,
-            onBack = { activeExercise = null },
-            onFinish = { activeExercise = null }
-        )
-    } else {
-        BackHandler(enabled = tab != Tab.Home) { tab = Tab.Home }
+    when {
+        currentProfile == null -> {
+            OnboardingScreen(
+                onComplete = {
+                    profile = it
+                    tab = Tab.Home
+                }
+            )
+        }
 
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            bottomBar = {
-                NavigationBar(containerColor = Color.White) {
-                    Tab.entries.forEach { item ->
-                        NavigationBarItem(
-                            selected = tab == item,
-                            onClick = { tab = item },
-                            icon = { Icon(item.icon, contentDescription = item.label) },
-                            label = { Text(item.label) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = DeepBlue,
-                                selectedTextColor = DeepBlue,
-                                indicatorColor = LightBlue,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+        exercise != null -> {
+            BackHandler { activeExercise = null }
+            WorkoutSessionScreen(
+                exercise = exercise,
+                onBack = { activeExercise = null },
+                onFinish = {
+                    history = history + WorkoutRecord(System.currentTimeMillis(), exercise.name)
+                    activeExercise = null
+                }
+            )
+        }
+
+        else -> {
+            BackHandler(enabled = tab != Tab.Home) { tab = Tab.Home }
+
+            Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                bottomBar = {
+                    NavigationBar(containerColor = Color.White) {
+                        Tab.entries.forEach { item ->
+                            NavigationBarItem(
+                                selected = tab == item,
+                                onClick = { tab = item },
+                                icon = { Icon(item.icon, contentDescription = item.label) },
+                                label = { Text(item.label) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = DeepBlue,
+                                    selectedTextColor = DeepBlue,
+                                    indicatorColor = LightBlue,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             )
-                        )
+                        }
                     }
                 }
-            }
-        ) { padding ->
-            Box(modifier = Modifier.padding(padding)) {
-                when (tab) {
-                    Tab.Home -> HomeScreen(
-                        profile = profile,
-                        onNavigate = { tab = it },
-                        onStart = { activeExercise = it }
-                    )
+            ) { padding ->
+                Box(modifier = Modifier.padding(padding)) {
+                    when (tab) {
+                        Tab.Home -> HomeScreen(
+                            profile = currentProfile,
+                            history = history,
+                            onNavigate = { tab = it },
+                            onStart = { activeExercise = it }
+                        )
 
-                    Tab.Plan -> RecommendationScreen(
-                        profile = profile,
-                        onSetupProfile = { tab = Tab.Profile },
-                        onStart = { activeExercise = it }
-                    )
+                        Tab.Plan -> RecommendationScreen(
+                            profile = currentProfile,
+                            onSetupProfile = { tab = Tab.Profile },
+                            onStart = { activeExercise = it }
+                        )
 
-                    Tab.Camera -> CameraScreen()
+                        Tab.Camera -> CameraScreen()
 
-                    Tab.Profile -> ProfileScreen(
-                        initial = profile,
-                        onSubmit = {
-                            profile = it
-                            tab = Tab.Plan
-                        }
-                    )
+                        Tab.Profile -> ProfileScreen(
+                            initial = currentProfile,
+                            onSubmit = {
+                                profile = it
+                                tab = Tab.Plan
+                            }
+                        )
+                    }
                 }
             }
         }
