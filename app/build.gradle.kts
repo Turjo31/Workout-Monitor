@@ -57,4 +57,5 @@ dependencies {
     implementation("androidx.camera:camera-view:1.6.2")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+    implementation("com.google.mediapipe:tasks-vision:1.1.0")
 }

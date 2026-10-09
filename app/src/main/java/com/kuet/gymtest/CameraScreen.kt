@@ -61,7 +61,7 @@ fun CameraScreen() {
             .background(LightBlue)
     ) {
         if (hasCamera) {
-            CameraPreview(modifier = Modifier.fillMaxSize())
+            PoseCamera(modifier = Modifier.fillMaxSize())
         } else {
             Column(
                 modifier = Modifier
@@ -87,7 +87,7 @@ fun CameraScreen() {
         }
 
         Text(
-            text = "Camera",
+            text = "Pose detection",
             color = DeepBlue,
             fontSize = 17.sp,
             fontWeight = FontWeight.Bold,
@@ -101,7 +101,7 @@ fun CameraScreen() {
         )
 
         Text(
-            text = "Position your full body inside the frame",
+            text = "Stand back so your full body is inside the frame",
             color = DeepBlue,
             fontSize = 13.sp,
             modifier = Modifier
