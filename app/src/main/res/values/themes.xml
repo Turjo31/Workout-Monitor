@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Theme used by the merged group application -->
     <style name="Theme.GymTest" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Theme from the local MediaPipe project -->
+    <style name="Base.Theme.MediaPipeTest" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Customize the light theme here if needed. -->
+    </style>
+
+    <style name="Theme.MediaPipeTest" parent="Base.Theme.MediaPipeTest" />
+
 </resources>

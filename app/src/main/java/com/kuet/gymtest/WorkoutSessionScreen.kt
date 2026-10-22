@@ -113,7 +113,7 @@ fun WorkoutSessionScreen(
             .background(LightBlue)
     ) {
         if (hasCamera) {
-            CameraPreview(modifier = Modifier.fillMaxSize())
+            PoseCamera(modifier = Modifier.fillMaxSize())
         } else {
             Column(
                 modifier = Modifier
