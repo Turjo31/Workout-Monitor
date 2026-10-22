@@ -1,39 +1,19 @@
+# Android Studio
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
+.idea/
 
-# Android/Gradle generated files
+# Gradle
 .gradle/
 build/
 app/build/
+
+# Local configuration
 local.properties
 
-# Android Studio local files
-.idea/caches/
-.idea/libraries/
-.idea/modules.xml
-.idea/workspace.xml
-.idea/navEditor.xml
-.idea/assetWizardSettings.xml
-
-# Native build output
+# Android build/native output
+captures/
 .externalNativeBuild/
 .cxx/
 
 # OS files
 .DS_Store
-
-# Android Studio project settings
-/.idea/
