@@ -1,4 +1,4 @@
-package com.example.mediapipetest
+package com.kuet.gymtest
 
 import android.content.Context
 import android.util.Log
