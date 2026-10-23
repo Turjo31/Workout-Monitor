@@ -5,112 +5,51 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircleOutline
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.kuet.gymtest.ui.theme.DeepBlue
-import com.kuet.gymtest.ui.theme.DeepGreen
-import com.kuet.gymtest.ui.theme.LightBlue
-import com.kuet.gymtest.ui.theme.LightGreen
+import com.kuet.gymtest.ui.components.*
+import com.kuet.gymtest.ui.theme.*
 
 @Composable
-fun CameraScreen() {
+fun CameraScreen(onBack: () -> Unit = {}) {
+    CameraSystemBars()
     val context = LocalContext.current
-
-    var hasCamera by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                    PackageManager.PERMISSION_GRANTED
-        )
-    }
-    val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { hasCamera = it }
-
-    LaunchedEffect(Unit) {
-        if (!hasCamera) launcher.launch(Manifest.permission.CAMERA)
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(LightBlue)
-    ) {
-        if (hasCamera) {
-            PoseCamera(modifier = Modifier.fillMaxSize())
-        } else {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    "Camera permission is needed",
-                    color = DeepBlue,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = { launcher.launch(Manifest.permission.CAMERA) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = LightGreen,
-                        contentColor = DeepGreen
-                    )
-                ) { Text("Grant access") }
-            }
+    var hasCamera by remember { mutableStateOf(
+        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    ) }
+    var tracking by remember { mutableStateOf(false) }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasCamera = it }
+    LaunchedEffect(Unit) { if (!hasCamera) permission.launch(Manifest.permission.CAMERA) }
+    Box(Modifier.fillMaxSize().background(Ink)) {
+        if (hasCamera) PoseCamera(Modifier.fillMaxSize()) {
+            tracking = it.landmarks.count { landmark -> landmark.visibility > .5f } >= 8
         }
-
-        Text(
-            text = "Pose detection",
-            color = DeepBlue,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding()
-                .padding(top = 12.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color.White.copy(alpha = 0.88f))
-                .padding(horizontal = 18.dp, vertical = 8.dp)
+        CameraScrim()
+        Row(Modifier.statusBarsPadding().padding(Space.Lg), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = CameraInk) }
+            Text("Pose preview", color = CameraInk, style = MaterialTheme.typography.headlineSmall)
+        }
+        if (!hasCamera) CameraPermissionCard(
+            { permission.launch(Manifest.permission.CAMERA) },
+            Modifier.align(Alignment.Center).padding(Space.Xl)
         )
-
-        Text(
-            text = "Stand back so your full body is inside the frame",
-            color = DeepBlue,
-            fontSize = 13.sp,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(16.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.White.copy(alpha = 0.88f))
-                .padding(16.dp)
-        )
+        GlassCard(
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(Space.Xl).fillMaxWidth(),
+            fill = CameraGlass, border = GlassBorder.copy(alpha = .3f)
+        ) {
+            Icon(Icons.Default.CheckCircleOutline, null, tint = TrackingGreen)
+            Text(if (tracking) "Pose detected" else "Find a little room to move",
+                color = CameraInk, style = MaterialTheme.typography.titleLarge)
+            Text("Stand back until your full body is visible. The overlay follows your movement.",
+                color = CameraInk.copy(alpha = .85f), style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }

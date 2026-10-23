@@ -6,7 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import com.kuet.gymtest.ui.theme.LightGreen
+import com.kuet.gymtest.ui.theme.TrackingGreen
 import kotlin.math.max
 
 private const val MIN_VISIBILITY = 0.5f
@@ -34,7 +34,7 @@ fun PoseOverlay(pose: PoseResult?, modifier: Modifier = Modifier) {
                 la.visibility > MIN_VISIBILITY && lb.visibility > MIN_VISIBILITY
             ) {
                 drawLine(
-                    color = LightGreen,
+                    color = TrackingGreen,
                     start = point(la),
                     end = point(lb),
                     strokeWidth = 8f,

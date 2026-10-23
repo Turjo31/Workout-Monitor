@@ -2,318 +2,127 @@ package com.kuet.gymtest
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.kuet.gymtest.ui.theme.DeepBlue
-import com.kuet.gymtest.ui.theme.DeepGreen
-import com.kuet.gymtest.ui.theme.LightBlue
-import com.kuet.gymtest.ui.theme.LightGreen
-
-private const val TOTAL_STEPS = 5
-
-private data class Choice(val value: String, val subtitle: String = "")
-
-private val genderChoices = listOf(Choice("Male"), Choice("Female"), Choice("Other"))
-
-private val goalChoices = listOf(
-    Choice("Muscle Gain", "Build strength and size"),
-    Choice("Weight Loss", "Burn calories and lose fat")
-)
-
-private val levelChoices = listOf(
-    Choice("Beginner", "New to working out"),
-    Choice("Intermediate", "You train regularly"),
-    Choice("Advanced", "Experienced and consistent")
-)
-
-private val equipmentChoices = listOf(
-    Choice("No Equipment", "Bodyweight only"),
-    Choice("Dumbbells", "A pair of dumbbells at home")
-)
+import com.kuet.gymtest.ui.components.*
+import com.kuet.gymtest.ui.theme.*
 
 @Composable
 fun OnboardingScreen(onComplete: (UserProfile) -> Unit) {
-    var step by remember { mutableIntStateOf(0) }
-    var age by remember { mutableStateOf("") }
-    var gender by remember { mutableStateOf("") }
-    var goal by remember { mutableStateOf("") }
-    var level by remember { mutableStateOf("") }
-    var equipment by remember { mutableStateOf("") }
-
-    val ageValue = age.toIntOrNull()
-    val ageValid = ageValue != null && ageValue in 10..100
-
+    var step by rememberSaveable { mutableIntStateOf(0) }
+    var age by key("onboarding-age-wheel") { rememberSaveable { mutableIntStateOf(25) } }
+    var gender by rememberSaveable { mutableStateOf("") }
+    var goal by rememberSaveable { mutableStateOf("") }
+    var level by rememberSaveable { mutableStateOf("") }
+    var equipment by rememberSaveable { mutableStateOf("") }
     val canContinue = when (step) {
-        0 -> ageValid
+        0 -> age in 10..100
         1 -> gender.isNotEmpty()
         2 -> goal.isNotEmpty()
         3 -> level.isNotEmpty()
         else -> equipment.isNotEmpty()
     }
-
-    val progress by animateFloatAsState(
-        targetValue = (step + 1) / TOTAL_STEPS.toFloat(),
-        label = "progress"
-    )
-
     BackHandler(enabled = step > 0) { step-- }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-    ) {
-        // Top bar: back + progress
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                if (step > 0) {
-                    IconButton(onClick = { step-- }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = DeepBlue)
-                    }
-                }
-            }
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(8.dp)
-                    .clip(CircleShape),
-                color = DeepBlue,
-                trackColor = LightBlue
-            )
-            Spacer(Modifier.width(12.dp))
-            Text(
-                "${step + 1}/$TOTAL_STEPS",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.width(12.dp))
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+        Row(Modifier.fillMaxWidth().padding(Space.Lg), verticalAlignment = Alignment.CenterVertically) {
+            if (step > 0) IconButton(onClick = { step-- }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Previous step")
+            } else Icon(Icons.Default.FitnessCenter, null, tint = Forest, modifier = Modifier.padding(Space.Md))
+            Text("Workout-Monitor", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+            Text("${step + 1} / 5", color = MutedInk, style = MaterialTheme.typography.labelLarge)
         }
-
-        // Step content
+        LinearProgressIndicator(
+            progress = { (step + 1) / 5f },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Space.Xxl).height(5.dp),
+            color = Forest, trackColor = ActionGreen.copy(alpha = .4f)
+        )
         AnimatedContent(
-            targetState = step,
-            modifier = Modifier.weight(1f),
-            transitionSpec = {
-                if (targetState > initialState) {
-                    (slideInHorizontally { it } + fadeIn()) togetherWith
-                            (slideOutHorizontally { -it } + fadeOut())
-                } else {
-                    (slideInHorizontally { -it } + fadeIn()) togetherWith
-                            (slideOutHorizontally { it } + fadeOut())
-                }
-            },
-            label = "step"
-        ) { s ->
+            targetState = step, modifier = Modifier.weight(1f),
+            transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "Onboarding step"
+        ) { current ->
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Xxl),
+                verticalArrangement = Arrangement.spacedBy(Space.Lg)
             ) {
-                when (s) {
-                    0 -> {
-                        StepHeader("How old are you?", "We use this to keep your plan safe and suitable.")
-                        Spacer(Modifier.height(32.dp))
-                        OutlinedTextField(
-                            value = age,
-                            onValueChange = { age = it.filter(Char::isDigit).take(3) },
-                            placeholder = { Text("Age", fontSize = 24.sp) },
-                            supportingText = { Text("Between 10 and 100") },
-                            isError = age.isNotEmpty() && !ageValid,
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.headlineMedium.copy(
-                                textAlign = TextAlign.Center,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            shape = RoundedCornerShape(18.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                Text("A LITTLE ABOUT YOU", color = Forest, style = MaterialTheme.typography.labelMedium)
+                Text(when (current) {
+                    0 -> "Your journey starts here."
+                    1 -> "How do you identify?"
+                    2 -> "What moves you?"
+                    3 -> "Find your starting point."
+                    else -> "Your space. Your equipment."
+                }, style = MaterialTheme.typography.headlineLarge)
+                Text(when (current) {
+                    0 -> "First, your age. We'll use it to personalize your exercise options."
+                    1 -> "This is a profile detail. It doesn't limit your exercise choices."
+                    2 -> "Choose the goal you'd like to work toward."
+                    3 -> "Choose the experience level that feels right. You can update it later."
+                    else -> "We'll start with movements you can do with what you have."
+                }, color = MutedInk)
+                Spacer(Modifier.height(Space.Sm))
+                if (current == 0) {
+                    GlassCard(Modifier.fillMaxWidth(), padding = PaddingValues(Space.Xl)) {
+                        AgeWheelPicker(initialAge = age, onAgeSelected = { age = it })
                     }
-
-                    1 -> ChoiceStep(
-                        "What's your gender?",
-                        "Used only as a profile detail.",
-                        genderChoices, gender
-                    ) { gender = it }
-
-                    2 -> ChoiceStep(
-                        "What's your goal?",
-                        "We'll pick exercises that match it.",
-                        goalChoices, goal
-                    ) { goal = it }
-
-                    3 -> ChoiceStep(
-                        "What's your fitness level?",
-                        "Be honest, you can change it later.",
-                        levelChoices, level
-                    ) { level = it }
-
-                    else -> ChoiceStep(
-                        "What equipment do you have?",
-                        "We'll only suggest what you can do.",
-                        equipmentChoices, equipment
-                    ) { equipment = it }
-                }
-            }
-        }
-
-        // Continue button
-        Button(
-            onClick = {
-                if (step < TOTAL_STEPS - 1) {
-                    step++
                 } else {
-                    onComplete(UserProfile(ageValue!!, gender, goal, level, equipment))
+                    val choices = when (current) {
+                        1 -> listOf("Male" to "", "Female" to "", "Other" to "")
+                        2 -> listOf("Muscle Gain" to "Build strength and muscle", "Weight Loss" to "Move more and build consistency")
+                        3 -> listOf("Beginner" to "I'm getting started", "Intermediate" to "I train regularly", "Advanced" to "I'm experienced and consistent")
+                        else -> listOf("No Equipment" to "Just me and a little space", "Dumbbells" to "A pair of weights, more possibilities")
+                    }
+                    val selected = when (current) { 1 -> gender; 2 -> goal; 3 -> level; else -> equipment }
+                    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(Space.Md)) {
+                        choices.forEach { (value, subtitle) ->
+                            val chosen = value == selected
+                            val fill by animateColorAsState(
+                                if (chosen) ActionGreen.copy(alpha = .5f) else GlassSurface, label = "Choice"
+                            )
+                            GlassCard(
+                                Modifier.fillMaxWidth().selectable(chosen, role = Role.RadioButton) {
+                                    when (current) { 1 -> gender = value; 2 -> goal = value; 3 -> level = value; else -> equipment = value }
+                                },
+                                fill = fill, border = if (chosen) Leaf else GlassBorder
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(value, style = MaterialTheme.typography.titleMedium)
+                                        if (subtitle.isNotEmpty()) Text(subtitle, color = MutedInk,
+                                            style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    if (chosen) Icon(Icons.Default.CheckCircle, null, tint = Forest)
+                                }
+                            }
+                        }
+                    }
                 }
-            },
-            enabled = canContinue,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-                .height(56.dp),
-            shape = RoundedCornerShape(18.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = LightGreen,
-                contentColor = DeepGreen,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Text(
-                if (step < TOTAL_STEPS - 1) "Continue" else "Get started",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-private fun StepHeader(title: String, subtitle: String) {
-    Text(title, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = DeepBlue)
-    Spacer(Modifier.height(6.dp))
-    Text(subtitle, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-}
-
-@Composable
-private fun ChoiceStep(
-    title: String,
-    subtitle: String,
-    choices: List<Choice>,
-    selected: String,
-    onSelect: (String) -> Unit
-) {
-    StepHeader(title, subtitle)
-    Spacer(Modifier.height(28.dp))
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        choices.forEach { choice ->
-            ChoiceCard(
-                choice = choice,
-                isSelected = choice.value == selected,
-                onClick = { onSelect(choice.value) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun ChoiceCard(choice: Choice, isSelected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(if (isSelected) LightBlue else MaterialTheme.colorScheme.surface)
-            .border(
-                width = 2.dp,
-                color = if (isSelected) DeepBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                shape = shape
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                choice.value,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isSelected) DeepBlue else MaterialTheme.colorScheme.onSurface
-            )
-            if (choice.subtitle.isNotEmpty()) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    choice.subtitle,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
-        if (isSelected) {
-            Icon(
-                Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = DeepBlue,
-                modifier = Modifier.size(26.dp)
-            )
-        }
+        WorkoutPrimaryButton(
+            if (step == 4) "Let's get moving" else "Continue",
+            {
+                if (step < 4) step++
+                else onComplete(UserProfile(age, gender, goal, level, equipment))
+            },
+            Modifier.fillMaxWidth().padding(horizontal = Space.Xxl, vertical = Space.Lg), enabled = canContinue
+        )
     }
 }

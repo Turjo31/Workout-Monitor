@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.haze)
 
     // Dependencies used by the local CameraX/XML/MediaPipe project
     implementation(libs.androidx.activity.ktx)

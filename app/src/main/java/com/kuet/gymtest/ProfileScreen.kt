@@ -2,261 +2,251 @@ package com.kuet.gymtest
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.kuet.gymtest.ui.components.*
 import com.kuet.gymtest.ui.theme.*
+import java.text.DateFormat
+import java.util.Date
+
+private const val WEEKLY_WORKOUT_TARGET = 3
 
 @Composable
 fun ProfileScreen(
-    initial: UserProfile?,
-    history: List<WorkoutRecord>,
-    plan: List<Exercise>,
-    onSubmit: (UserProfile) -> Unit
+    initial: UserProfile?, history: List<WorkoutRecord>, plan: List<Exercise>,
+    onSubmit: (UserProfile) -> Unit, onOpenPlan: () -> Unit, onCamera: () -> Unit
 ) {
     val profile = initial ?: return
-    var editing by remember { mutableStateOf(false) }
-    val workoutDays = remember(history) { history.map { DayUtils.startOfDay(it.timestamp) }.toSet() }
-    val streak = remember(workoutDays) { DayUtils.streak(workoutDays) }
-    val weekDays = remember { DayUtils.weekDays().toSet() }
-    val weeklyWorkouts = history.count { DayUtils.startOfDay(it.timestamp) in weekDays }
-
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-            .background(MaterialTheme.colorScheme.background)
+    var editing by rememberSaveable { mutableStateOf(false) }
+    var showHistory by rememberSaveable { mutableStateOf(false) }
+    var showDataInfo by rememberSaveable { mutableStateOf(false) }
+    val week = DayUtils.weekDays()
+    val counts = week.map { day -> history.count { DayUtils.startOfDay(it.timestamp) == day } }
+    val weeklyCount = counts.sum()
+    val doneDays = history.map { DayUtils.startOfDay(it.timestamp) }.toSet()
+    val streak = DayUtils.streak(doneDays)
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = Space.Xl, end = Space.Xl, bottom = Space.Xxl),
+        verticalArrangement = Arrangement.spacedBy(Space.Lg)
     ) {
-        ProfileHero(profile, onEdit = { editing = !editing })
-
-        Column(
-            Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ProfileStat(Modifier.weight(1f), history.size.toString(), "Workouts", Icons.Default.FitnessCenter)
-                ProfileStat(Modifier.weight(1f), streak.toString(), "Day streak", Icons.Default.LocalFireDepartment)
-                ProfileStat(Modifier.weight(1f), plan.size.toString(), "In plan", Icons.Default.CheckCircle)
+        item {
+            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(top = Space.Lg),
+                verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Your profile", style = MaterialTheme.typography.headlineLarge)
+                    Text("Keep going. You're building something.", color = MutedInk,
+                        style = MaterialTheme.typography.bodyMedium)
+                }
+                IconButton(onClick = { editing = true }) { Icon(Icons.Default.Edit, "Edit profile") }
             }
-
-            if (editing) {
-                EditProfileCard(profile) {
-                    onSubmit(it)
-                    editing = false
-                }
-            } else {
-                SectionCard("Personal details", Icons.Default.Person) {
-                    DetailRow("Age", "${profile.age} years")
-                    HorizontalDivider()
-                    DetailRow("Gender", profile.gender)
-                }
-
-                SectionCard("Training profile", Icons.Default.Tune) {
-                    DetailRow("Primary goal", profile.goal)
-                    HorizontalDivider()
-                    DetailRow("Fitness level", profile.fitnessLevel)
-                    HorizontalDivider()
-                    DetailRow("Available equipment", profile.equipment)
+        }
+        item {
+            GlassCard(Modifier.fillMaxWidth(), onClick = { editing = true }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(72.dp).background(ActionGreen.copy(alpha = .5f), CircleShape),
+                        contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.PersonOutline, null, tint = Forest, modifier = Modifier.size(36.dp))
+                    }
+                    Spacer(Modifier.width(Space.Lg))
+                    Column(Modifier.weight(1f)) {
+                        Text("Your fitness profile", style = MaterialTheme.typography.titleLarge)
+                        Text("${profile.age} years · ${profile.gender}", color = MutedInk,
+                            style = MaterialTheme.typography.bodyMedium)
+                        Text(profile.fitnessLevel, color = Forest, style = MaterialTheme.typography.labelMedium)
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MutedInk)
                 }
             }
-
-            SectionCard("Weekly activity", Icons.Default.CalendarMonth) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        "$weeklyWorkouts",
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = DeepBlue
-                    )
-                    Text(
-                        " / 3 workouts",
-                        modifier = Modifier.padding(bottom = 5.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Sm)) {
+                GlassStatCard(history.size.toString(), "Workouts", Icons.Default.FitnessCenter, Modifier.weight(1f))
+                GlassStatCard(streak.toString(), "Day streak", Icons.Default.LocalFireDepartment, Modifier.weight(1f))
+                GlassStatCard(plan.size.toString(), "In your plan", Icons.Default.CheckCircleOutline, Modifier.weight(1f))
+            }
+        }
+        item { SectionHeading("Progress", "History") { showHistory = true } }
+        item {
+            GlassCard(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Weekly activity", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    Text("$weeklyCount/$WEEKLY_WORKOUT_TARGET", style = MaterialTheme.typography.titleLarge, color = Forest)
                 }
-                Spacer(Modifier.height(10.dp))
+                Text("Workouts completed each day", color = MutedInk, style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(Space.Lg))
+                WeeklyActivity(week, counts)
+                Spacer(Modifier.height(Space.Lg))
                 LinearProgressIndicator(
-                    progress = { (weeklyWorkouts / 3f).coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
-                    color = DeepGreen,
-                    trackColor = LightGreen
+                    progress = { (weeklyCount.toFloat() / WEEKLY_WORKOUT_TARGET).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                    color = Forest, trackColor = ActionGreen.copy(alpha = .45f)
                 )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    if (weeklyWorkouts >= 3) "Weekly goal completed — great work!"
-                    else "${3 - weeklyWorkouts} more to reach your weekly goal",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Spacer(Modifier.height(Space.Sm))
+                Text(if (weeklyCount >= WEEKLY_WORKOUT_TARGET) "Weekly goal reached. Well done!"
+                    else "Working toward $WEEKLY_WORKOUT_TARGET workouts this week",
+                    color = MutedInk, style = MaterialTheme.typography.bodySmall)
             }
-
-            SectionCard("Workout settings", Icons.Default.Settings) {
-                SettingRow(Icons.Default.CameraAlt, "Pose monitoring", "Camera overlay enabled")
-                HorizontalDivider()
-                SettingRow(Icons.Default.Speed, "Training level", profile.fitnessLevel)
-                HorizontalDivider()
-                SettingRow(Icons.Default.SportsGymnastics, "Exercise plan", "${plan.size} selected exercises")
-            }
-
-            Text(
-                "Your profile details are used to personalize exercise recommendations.",
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp
-            )
         }
-    }
-}
-
-@Composable
-private fun ProfileHero(profile: UserProfile, onEdit: () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().background(LightBlue).statusBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 22.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(76.dp).clip(CircleShape).background(Color.White),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Person, null, tint = DeepBlue, modifier = Modifier.size(42.dp))
+        item { SectionHeading("Training preferences", "Edit") { editing = true } }
+        item {
+            GlassCard(Modifier.fillMaxWidth()) {
+                ProfileDetail("Primary goal", profile.goal)
+                HorizontalDivider(color = WarmOutline.copy(alpha = .25f))
+                ProfileDetail("Fitness level", profile.fitnessLevel)
+                HorizontalDivider(color = WarmOutline.copy(alpha = .25f))
+                ProfileDetail("Equipment", profile.equipment)
             }
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Fitness profile", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = DeepBlue)
-                Text(
-                    "${profile.fitnessLevel} • ${profile.goal}",
-                    fontSize = 14.sp,
-                    color = DeepBlue.copy(alpha = .75f)
-                )
-                Spacer(Modifier.height(5.dp))
-                Surface(color = LightGreen, shape = CircleShape) {
-                    Text(
-                        "ACTIVE",
-                        color = DeepGreen,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
+        }
+        item { SectionHeading("Milestones") }
+        item {
+            GlassCard(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(if (history.isEmpty()) Icons.Default.OutlinedFlag else Icons.Default.EmojiEvents,
+                        null, tint = Forest, modifier = Modifier.size(36.dp))
+                    Spacer(Modifier.width(Space.Md))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (streak >= 7) "7-day streak" else if (history.isNotEmpty()) "First workout complete" else "Your first workout awaits",
+                            style = MaterialTheme.typography.titleMedium)
+                        Text(if (streak >= 7) "Seven days of showing up for yourself."
+                            else if (history.isNotEmpty()) "Every session is a step forward."
+                            else "Finish a session to start your journey.",
+                            color = MutedInk, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
-            FilledTonalIconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit profile")
+        }
+        item { SectionHeading("Your space") }
+        item { ProfileAction(Icons.Default.Edit, "Edit profile", "Personal details and training preferences") { editing = true } }
+        item { ProfileAction(Icons.Default.FitnessCenter, "Your workout plan", "${plan.size} selected exercises", onOpenPlan) }
+        item { ProfileAction(Icons.Default.CameraAlt, "Pose preview", "Open the camera and live pose overlay", onCamera) }
+        item { ProfileAction(Icons.Default.Info, "About your data", "How your profile and workouts are kept") { showDataInfo = true } }
+        item { Text("Workout-Monitor · Move with intention", color = MutedInk,
+            style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = Space.Sm)) }
+    }
+    if (editing) EditProfileSheet(profile, { editing = false }) { onSubmit(it); editing = false }
+    if (showHistory) HistorySheet(history) { showHistory = false }
+    if (showDataInfo) AlertDialog(
+        onDismissRequest = { showDataInfo = false },
+        icon = { Icon(Icons.Default.PrivacyTip, null) },
+        title = { Text("Your workout data") },
+        text = { Text("Pose detection runs on your device. This app does not upload camera frames. Your profile, plan and workout history are currently held locally in the app session. They can be restored after rotation, but are not stored as a permanent account.") },
+        confirmButton = { TextButton(onClick = { showDataInfo = false }) { Text("Got it") } },
+        containerColor = IvoryLight
+    )
+}
+
+@Composable
+private fun ProfileDetail(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = Space.Md), horizontalArrangement = Arrangement.spacedBy(Space.Lg)) {
+        Text(label, Modifier.weight(1f), color = MutedInk, style = MaterialTheme.typography.bodyMedium)
+        Text(value, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = Ink)
+    }
+}
+
+@Composable
+private fun ProfileAction(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    GlassCard(Modifier.fillMaxWidth(), onClick = onClick, shape = WorkoutShapes.Exercise) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Md)) {
+            Icon(icon, null, tint = Forest)
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MutedInk)
             }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MutedInk)
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProfileStat(modifier: Modifier, value: String, label: String, icon: ImageVector) {
-    Card(modifier, shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(Color.White)) {
-        Column(
-            Modifier.fillMaxWidth().padding(vertical = 14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(icon, null, tint = DeepBlue, modifier = Modifier.size(20.dp))
-            Text(value, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun SectionCard(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(Color.White),
-        elevation = CardDefaults.cardElevation(1.dp)
-    ) {
-        Column(Modifier.padding(18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(36.dp).background(LightBlue, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) { Icon(icon, null, tint = DeepBlue, modifier = Modifier.size(20.dp)) }
-                Spacer(Modifier.width(10.dp))
-                Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            }
-            Spacer(Modifier.height(14.dp))
-            content()
-        }
-    }
-}
-
-@Composable
-private fun DetailRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-        Text(label, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, fontWeight = FontWeight.SemiBold, color = DeepBlue)
-    }
-}
-
-@Composable
-private fun SettingRow(icon: ImageVector, title: String, subtitle: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = DeepGreen)
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(title, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun EditProfileCard(profile: UserProfile, save: (UserProfile) -> Unit) {
-    var age by remember(profile) { mutableStateOf(profile.age.toString()) }
-    var gender by remember(profile) { mutableStateOf(profile.gender) }
-    var goal by remember(profile) { mutableStateOf(profile.goal) }
-    var level by remember(profile) { mutableStateOf(profile.fitnessLevel) }
-    var equipment by remember(profile) { mutableStateOf(profile.equipment) }
+private fun EditProfileSheet(profile: UserProfile, onDismiss: () -> Unit, onSave: (UserProfile) -> Unit) {
+    var age by rememberSaveable { mutableStateOf(profile.age.toString()) }
+    var gender by rememberSaveable { mutableStateOf(profile.gender) }
+    var goal by rememberSaveable { mutableStateOf(profile.goal) }
+    var level by rememberSaveable { mutableStateOf(profile.fitnessLevel) }
+    var equipment by rememberSaveable { mutableStateOf(profile.equipment) }
     val ageValue = age.toIntOrNull()
     val valid = ageValue != null && ageValue in 10..100
-
-    SectionCard("Edit fitness profile", Icons.Default.Edit) {
-        OutlinedTextField(
-            age, { age = it.filter(Char::isDigit).take(3) },
-            label = { Text("Age") }, singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            isError = age.isNotEmpty() && !valid,
-            modifier = Modifier.fillMaxWidth()
-        )
-        EditOptions("Gender", listOf("Male", "Female", "Other"), gender) { gender = it }
-        EditOptions("Goal", listOf("Muscle Gain", "Weight Loss"), goal) { goal = it }
-        EditOptions("Fitness level", listOf("Beginner", "Intermediate", "Advanced"), level) { level = it }
-        EditOptions("Equipment", listOf("No Equipment", "Dumbbells"), equipment) { equipment = it }
-        Button(
-            onClick = { save(UserProfile(ageValue!!, gender, goal, level, equipment)) },
-            enabled = valid,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = DeepGreen),
-            shape = RoundedCornerShape(14.dp)
-        ) { Text("Save changes", fontWeight = FontWeight.Bold) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss, containerColor = IvoryLight,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(Modifier.fillMaxHeight(.9f).imePadding()) {
+            Column(
+                Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = Space.Xl),
+                verticalArrangement = Arrangement.spacedBy(Space.Md)
+            ) {
+                Text("Make it personal", style = MaterialTheme.typography.headlineMedium)
+                Text("Your preferences set the starting point for recommendations.", color = MutedInk)
+                OutlinedTextField(
+                    value = age, onValueChange = { age = it.filter(Char::isDigit).take(3) },
+                    label = { Text("Age") }, supportingText = { Text("Enter an age from 10 to 100") },
+                    singleLine = true, isError = age.isNotEmpty() && !valid,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(), shape = WorkoutShapes.Control
+                )
+                ProfileChoices("Gender", listOf("Male", "Female", "Other"), gender) { gender = it }
+                ProfileChoices("Fitness goal", listOf("Muscle Gain", "Weight Loss"), goal) { goal = it }
+                ProfileChoices("Fitness level", listOf("Beginner", "Intermediate", "Advanced"), level) { level = it }
+                ProfileChoices("Equipment", listOf("No Equipment", "Dumbbells"), equipment) { equipment = it }
+                Text("Changing preferences may remove exercises from your plan if they no longer match.",
+                    color = MutedInk, style = MaterialTheme.typography.bodySmall)
+            }
+            WorkoutPrimaryButton("Save changes", {
+                ageValue?.takeIf { it in 10..100 }?.let { onSave(UserProfile(it, gender, goal, level, equipment)) }
+            }, Modifier.fillMaxWidth().padding(Space.Lg), enabled = valid, icon = Icons.Default.Check)
+        }
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun EditOptions(label: String, values: List<String>, selected: String, select: (String) -> Unit) {
-    Text(label, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        values.forEach { value ->
-            FilterChip(selected == value, { select(value) }, { Text(value) })
+private fun ProfileChoices(title: String, choices: List<String>, value: String, onSelect: (String) -> Unit) {
+    Column {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Sm)) {
+            choices.forEach { choice -> WorkoutFilterChip(choice, value == choice) { onSelect(choice) } }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HistorySheet(history: List<WorkoutRecord>, onDismiss: () -> Unit) {
+    val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = IvoryLight,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        LazyColumn(Modifier.fillMaxHeight(.8f), contentPadding = PaddingValues(Space.Xl),
+            verticalArrangement = Arrangement.spacedBy(Space.Md)) {
+            item { Text("Workout history", style = MaterialTheme.typography.headlineMedium) }
+            if (history.isEmpty()) item {
+                GlassCard(Modifier.fillMaxWidth()) {
+                    Text("A fresh start", style = MaterialTheme.typography.titleMedium)
+                    Text("Your finished sessions will appear here.", color = MutedInk)
+                }
+            }
+            items(history.sortedByDescending { it.timestamp }) {
+                GlassCard(Modifier.fillMaxWidth()) {
+                    Text(it.exerciseName, style = MaterialTheme.typography.titleMedium)
+                    Text(dateFormat.format(Date(it.timestamp)), color = MutedInk)
+                }
+            }
         }
     }
 }
