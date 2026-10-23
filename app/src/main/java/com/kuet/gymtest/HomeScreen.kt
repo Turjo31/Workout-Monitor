@@ -53,11 +53,14 @@ private val dayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
 @Composable
 fun HomeScreen(
     profile: UserProfile,
+    plan: List<Exercise>,
     history: List<WorkoutRecord>,
     onNavigate: (Tab) -> Unit,
     onStart: (Exercise) -> Unit
 ) {
-    val pick = remember(profile) { RecommendationEngine.recommend(profile).firstOrNull() }
+    val pick = remember(profile, plan) {
+        plan.firstOrNull() ?: RecommendationEngine.recommend(profile).firstOrNull()
+    }
     val greeting = remember { DayUtils.greeting() }
     val weekDays = remember { DayUtils.weekDays() }
     val today = remember { DayUtils.startOfDay() }
@@ -165,6 +168,11 @@ fun HomeScreen(
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text("Your plan", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (plan.isEmpty()) "No exercises selected yet" else "${plan.size} exercises selected",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Tag(profile.goal)

@@ -3,6 +3,7 @@ package com.kuet.gymtest
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -21,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -28,6 +32,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,11 +55,21 @@ import com.kuet.gymtest.ui.theme.LightGreen
 @Composable
 fun RecommendationScreen(
     profile: UserProfile?,
+    plan: List<Exercise>,
     onSetupProfile: () -> Unit,
+    onTogglePlan: (Exercise) -> Unit,
     onStart: (Exercise) -> Unit
 ) {
     val exercises = remember(profile) {
-        profile?.let { RecommendationEngine.recommend(it) } ?: emptyList()
+        profile?.let { RecommendationEngine.matchingExercises(it) } ?: emptyList()
+    }
+    val muscleGroups = remember(exercises) {
+        listOf("All") + exercises.map { it.muscleGroup }.distinct().sorted()
+    }
+    var selectedMuscle by remember(profile) { mutableStateOf("All") }
+    val visibleMatches = remember(exercises, selectedMuscle) {
+        if (selectedMuscle == "All") exercises
+        else exercises.filter { it.muscleGroup == selectedMuscle }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -98,8 +113,74 @@ fun RecommendationScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(exercises, key = { it.name }) { exercise ->
-                    ExerciseCard(exercise, onStart = { onStart(exercise) })
+                item {
+                    Text(
+                        "My plan",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        if (plan.isEmpty()) {
+                            "Your plan is empty. Add exercises from your matches below."
+                        } else {
+                            "${plan.size} selected exercises"
+                        },
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                items(plan, key = { "plan-${it.name}" }) { exercise ->
+                    ExerciseCard(
+                        exercise = exercise,
+                        onStart = { onStart(exercise) },
+                        isInPlan = true,
+                        onPlanToggle = { onTogglePlan(exercise) }
+                    )
+                }
+
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Matched for you",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Browse the matches and add only the exercises you want.",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        muscleGroups.forEach { muscle ->
+                            androidx.compose.material3.FilterChip(
+                                selected = selectedMuscle == muscle,
+                                onClick = { selectedMuscle = muscle },
+                                label = { Text(muscle) }
+                            )
+                        }
+                    }
+                    Text(
+                        "${visibleMatches.size} matching exercises",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                items(visibleMatches, key = { "match-${it.name}" }) { exercise ->
+                    ExerciseCard(
+                        exercise = exercise,
+                        onStart = { onStart(exercise) },
+                        isInPlan = plan.any { it.name == exercise.name },
+                        onPlanToggle = { onTogglePlan(exercise) }
+                    )
                 }
             }
         }
@@ -150,7 +231,12 @@ private fun HeaderTag(text: String) {
 }
 
 @Composable
-fun ExerciseCard(exercise: Exercise, onStart: () -> Unit) {
+fun ExerciseCard(
+    exercise: Exercise,
+    onStart: () -> Unit,
+    isInPlan: Boolean? = null,
+    onPlanToggle: (() -> Unit)? = null
+) {
     var expanded by remember { mutableStateOf(false) }
 
     Card(
@@ -226,20 +312,42 @@ fun ExerciseCard(exercise: Exercise, onStart: () -> Unit) {
 
             Spacer(Modifier.height(14.dp))
 
-            Button(
-                onClick = onStart,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = LightGreen,
-                    contentColor = DeepGreen
-                )
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text("Start", fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onStart,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = LightGreen,
+                        contentColor = DeepGreen
+                    )
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Start", fontWeight = FontWeight.Bold)
+                }
+
+                if (isInPlan != null && onPlanToggle != null) {
+                    OutlinedButton(
+                        onClick = onPlanToggle,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(
+                            if (isInPlan) Icons.Default.Check else Icons.Default.Add,
+                            contentDescription = null
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            if (isInPlan) "Remove" else "Add to plan",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
     }

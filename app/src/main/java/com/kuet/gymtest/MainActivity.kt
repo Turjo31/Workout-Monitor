@@ -64,6 +64,7 @@ fun AppNavigation() {
     var profile by remember { mutableStateOf<UserProfile?>(null) }
     var activeExercise by remember { mutableStateOf<Exercise?>(null) }
     var history by remember { mutableStateOf(listOf<WorkoutRecord>()) }
+    var plan by remember { mutableStateOf(listOf<Exercise>()) }
 
     val currentProfile = profile
     val exercise = activeExercise
@@ -120,6 +121,7 @@ fun AppNavigation() {
                     when (tab) {
                         Tab.Home -> HomeScreen(
                             profile = currentProfile,
+                            plan = plan,
                             history = history,
                             onNavigate = { tab = it },
                             onStart = { activeExercise = it }
@@ -127,7 +129,15 @@ fun AppNavigation() {
 
                         Tab.Plan -> RecommendationScreen(
                             profile = currentProfile,
+                            plan = plan,
                             onSetupProfile = { tab = Tab.Profile },
+                            onTogglePlan = { selected ->
+                                plan = if (plan.any { it.name == selected.name }) {
+                                    plan.filterNot { it.name == selected.name }
+                                } else {
+                                    plan + selected
+                                }
+                            },
                             onStart = { activeExercise = it }
                         )
 
@@ -139,6 +149,10 @@ fun AppNavigation() {
                             initial = currentProfile,
                             onSubmit = {
                                 profile = it
+                                val eligibleNames = RecommendationEngine.matchingExercises(it)
+                                    .map(Exercise::name)
+                                    .toSet()
+                                plan = plan.filter { exercise -> exercise.name in eligibleNames }
                                 tab = Tab.Plan
                             }
                         )

@@ -194,7 +194,7 @@ object RecommendationEngine {
         else -> 0
     }
 
-    fun recommend(profile: UserProfile): List<Exercise> {
+    fun matchingExercises(profile: UserProfile): List<Exercise> {
         val userLevel = rank(profile.fitnessLevel)
 
         val eligible = exercises.filter {
@@ -209,8 +209,11 @@ object RecommendationEngine {
                 .thenByDescending { it.equipment == profile.equipment && it.equipment != NONE }
         )
 
-        return interleave(ranked).take(8)
+        return interleave(ranked)
     }
+
+    fun recommend(profile: UserProfile): List<Exercise> =
+        matchingExercises(profile).take(8)
 
     // Mix muscle groups so the list isn't all legs, then all chest, etc.
     private fun interleave(list: List<Exercise>): List<Exercise> {
