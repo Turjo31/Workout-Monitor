@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">GymTest</string>
+    <string name="app_name">Workout-Monitor</string>
     <string name="title_activity_pose_landmarker_helper.kt">PoseLandmarkerHelper.kt</string>
 
     <!-- Preference Titles -->

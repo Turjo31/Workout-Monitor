@@ -66,6 +66,7 @@ class PoseDetector(
         landmarker = PoseLandmarker.createFromOptions(context, options)
     }
 
+    @Synchronized
     fun detect(imageProxy: ImageProxy, isFrontCamera: Boolean) {
         if (closed) {
             imageProxy.close()
@@ -103,6 +104,7 @@ class PoseDetector(
         onResult(PoseResult(landmarks, input.width, input.height))
     }
 
+    @Synchronized
     fun close() {
         closed = true
         landmarker.close()
