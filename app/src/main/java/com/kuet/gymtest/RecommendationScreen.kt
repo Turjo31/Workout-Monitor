@@ -150,7 +150,7 @@ private fun HeaderTag(text: String) {
 }
 
 @Composable
-private fun ExerciseCard(exercise: Exercise, onStart: () -> Unit) {
+fun ExerciseCard(exercise: Exercise, onStart: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
 
     Card(

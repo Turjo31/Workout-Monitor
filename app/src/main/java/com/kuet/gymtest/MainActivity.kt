@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -37,7 +37,7 @@ import com.kuet.gymtest.ui.theme.LightBlue
 enum class Tab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
     Plan("Plan", Icons.Default.FitnessCenter),
-    Camera("Camera", Icons.Default.CameraAlt),
+    Exercises("Exercises", Icons.AutoMirrored.Filled.ViewList),
     Profile("Profile", Icons.Default.Person)
 }
 
@@ -131,7 +131,9 @@ fun AppNavigation() {
                             onStart = { activeExercise = it }
                         )
 
-                        Tab.Camera -> CameraScreen()
+                        Tab.Exercises -> ExercisePoolScreen(
+                            onStart = { activeExercise = it }
+                        )
 
                         Tab.Profile -> ProfileScreen(
                             initial = currentProfile,

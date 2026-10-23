@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -191,7 +190,9 @@ fun HomeScreen(
 
             // Quick actions
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                QuickCard(Modifier.weight(1f), Icons.Default.CameraAlt, "Camera") { onNavigate(Tab.Camera) }
+                QuickCard(Modifier.weight(1f), Icons.Default.FitnessCenter, "All exercises") {
+                    onNavigate(Tab.Exercises)
+                }
                 QuickCard(Modifier.weight(1f), Icons.Default.Person, "Profile") { onNavigate(Tab.Profile) }
             }
         }
