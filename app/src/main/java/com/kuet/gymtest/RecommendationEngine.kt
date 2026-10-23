@@ -195,18 +195,32 @@ object RecommendationEngine {
     }
 
     fun matchingExercises(profile: UserProfile): List<Exercise> {
-        val userLevel = rank(profile.fitnessLevel)
+        return filterExercises(
+            age = profile.age,
+            goal = profile.goal,
+            maxLevel = profile.fitnessLevel,
+            equipment = profile.equipment
+        )
+    }
 
+    fun filterExercises(
+        age: Int,
+        goal: String? = null,
+        maxLevel: String? = null,
+        equipment: String? = null,
+        muscleGroup: String? = null
+    ): List<Exercise> {
         val eligible = exercises.filter {
-            it.goal == profile.goal &&
-                    rank(it.level) <= userLevel &&
-                    (it.equipment == NONE || it.equipment == profile.equipment) &&
-                    (profile.age < 50 || it.lowImpact)
+            (goal == null || it.goal == goal) &&
+                    (maxLevel == null || rank(it.level) <= rank(maxLevel)) &&
+                    (equipment == null || it.equipment == NONE || it.equipment == equipment) &&
+                    (muscleGroup == null || it.muscleGroup == muscleGroup) &&
+                    (age < 50 || it.lowImpact)
         }
 
         val ranked = eligible.sortedWith(
             compareByDescending<Exercise> { rank(it.level) }
-                .thenByDescending { it.equipment == profile.equipment && it.equipment != NONE }
+                .thenByDescending { equipment != null && it.equipment == equipment && it.equipment != NONE }
         )
 
         return interleave(ranked)

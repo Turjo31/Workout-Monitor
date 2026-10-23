@@ -147,6 +147,8 @@ fun AppNavigation() {
 
                         Tab.Profile -> ProfileScreen(
                             initial = currentProfile,
+                            history = history,
+                            plan = plan,
                             onSubmit = {
                                 profile = it
                                 val eligibleNames = RecommendationEngine.matchingExercises(it)
