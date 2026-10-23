@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -37,7 +37,7 @@ import com.kuet.gymtest.ui.theme.LightBlue
 enum class Tab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
     Plan("Plan", Icons.Default.FitnessCenter),
-    Camera("Camera", Icons.Default.CameraAlt),
+    Exercises("Exercises", Icons.AutoMirrored.Filled.ViewList),
     Profile("Profile", Icons.Default.Person)
 }
 
@@ -64,6 +64,7 @@ fun AppNavigation() {
     var profile by remember { mutableStateOf<UserProfile?>(null) }
     var activeExercise by remember { mutableStateOf<Exercise?>(null) }
     var history by remember { mutableStateOf(listOf<WorkoutRecord>()) }
+    var plan by remember { mutableStateOf(listOf<Exercise>()) }
 
     val currentProfile = profile
     val exercise = activeExercise
@@ -120,6 +121,7 @@ fun AppNavigation() {
                     when (tab) {
                         Tab.Home -> HomeScreen(
                             profile = currentProfile,
+                            plan = plan,
                             history = history,
                             onNavigate = { tab = it },
                             onStart = { activeExercise = it }
@@ -127,16 +129,32 @@ fun AppNavigation() {
 
                         Tab.Plan -> RecommendationScreen(
                             profile = currentProfile,
+                            plan = plan,
                             onSetupProfile = { tab = Tab.Profile },
+                            onTogglePlan = { selected ->
+                                plan = if (plan.any { it.name == selected.name }) {
+                                    plan.filterNot { it.name == selected.name }
+                                } else {
+                                    plan + selected
+                                }
+                            },
                             onStart = { activeExercise = it }
                         )
 
-                        Tab.Camera -> CameraScreen()
+                        Tab.Exercises -> ExercisePoolScreen(
+                            onStart = { activeExercise = it }
+                        )
 
                         Tab.Profile -> ProfileScreen(
                             initial = currentProfile,
+                            history = history,
+                            plan = plan,
                             onSubmit = {
                                 profile = it
+                                val eligibleNames = RecommendationEngine.matchingExercises(it)
+                                    .map(Exercise::name)
+                                    .toSet()
+                                plan = plan.filter { exercise -> exercise.name in eligibleNames }
                                 tab = Tab.Plan
                             }
                         )
