@@ -10,8 +10,8 @@ val ProfileStateSaver = listSaver<UserProfile?, Any>(
 )
 
 val HistoryStateSaver = listSaver<List<WorkoutRecord>, Any>(
-    save = { records -> records.flatMap { listOf(it.timestamp, it.exerciseName) } },
-    restore = { values -> values.chunked(2).map { WorkoutRecord(it[0] as Long, it[1] as String) } }
+    save = { WorkoutHistoryCodec.encode(it) },
+    restore = WorkoutHistoryCodec::decode
 )
 
 val PlanNamesStateSaver = listSaver<List<String>, String>(

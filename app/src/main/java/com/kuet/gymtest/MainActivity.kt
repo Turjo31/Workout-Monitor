@@ -3,6 +3,7 @@ package com.kuet.gymtest
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.viewModels
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -21,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import com.kuet.gymtest.session.WorkoutSessionViewModel
 import com.kuet.gymtest.ui.components.AppBackground
 import com.kuet.gymtest.ui.components.LocalGlassBackdrop
 import com.kuet.gymtest.ui.components.WorkoutBottomNavigation
@@ -34,6 +36,7 @@ enum class Tab(val label: String, val icon: ImageVector) {
 }
 
 class MainActivity : ComponentActivity() {
+    private val workoutSession by viewModels<WorkoutSessionViewModel>()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
@@ -41,13 +44,13 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
         )
         setContent {
-            GymTestTheme { AppBackground { AppNavigation() } }
+            GymTestTheme { AppBackground { AppNavigation(workoutSession) } }
         }
     }
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(workoutSession: WorkoutSessionViewModel) {
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
     var profile by rememberSaveable(stateSaver = ProfileStateSaver) { mutableStateOf<UserProfile?>(null) }
     var activeExerciseName by rememberSaveable { mutableStateOf<String?>(null) }
@@ -60,7 +63,7 @@ fun AppNavigation() {
     val currentProfile = profile
     val screenState = rememberSaveableStateHolder()
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    val startExercise: (Exercise) -> Unit = { activeExerciseName = it.name }
+    val startExercise: (Exercise) -> Unit = { workoutSession.discard(); activeExerciseName = it.name }
     val togglePlan: (Exercise) -> Unit = { selected ->
         planNames = if (selected.name in planNames) planNames - selected.name else planNames + selected.name
     }
@@ -71,14 +74,21 @@ fun AppNavigation() {
             tab = Tab.Home
         }
         exercise != null -> {
-            BackHandler { activeExerciseName = null }
+            BackHandler { workoutSession.discard(); activeExerciseName = null }
             CompositionLocalProvider(LocalGlassBackdrop provides null) {
                 WorkoutSessionScreen(
                     exercise = exercise,
-                    onBack = { activeExerciseName = null },
-                    onFinish = {
-                        history = history + WorkoutRecord(System.currentTimeMillis(), exercise.name)
-                        activeExerciseName = null
+                    viewModel = workoutSession,
+                    onBack = { workoutSession.discard(); activeExerciseName = null },
+                    onFinish = { summary ->
+                        if (activeExerciseName != null) {
+                            val record = if (exercise.name == "Bodyweight Squat") summary?.let(WorkoutRecord::measured)
+                                else WorkoutRecord(System.currentTimeMillis(), exercise.name,
+                                    java.util.UUID.randomUUID().toString(), WorkoutRecordKind.DEMO)
+                            if (record != null) history = WorkoutHistoryCodec.appendOnce(history, record)
+                            workoutSession.discard()
+                            activeExerciseName = null
+                        }
                     }
                 )
             }

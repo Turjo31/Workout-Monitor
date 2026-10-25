@@ -24,9 +24,16 @@ import androidx.core.content.ContextCompat
 import com.kuet.gymtest.ui.components.*
 import com.kuet.gymtest.ui.theme.*
 import kotlinx.coroutines.delay
+import com.kuet.gymtest.session.WorkoutSessionViewModel
+import com.kuet.gymtest.session.WorkoutSummary
 
 @Composable
-fun WorkoutSessionScreen(exercise: Exercise, onBack: () -> Unit, onFinish: () -> Unit) {
+fun WorkoutSessionScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel,
+    onBack: () -> Unit, onFinish: (WorkoutSummary?) -> Unit) {
+    if (exercise.name == "Bodyweight Squat") {
+        MeasuredWorkoutScreen(exercise, viewModel, onBack, onFinish)
+        return
+    }
     CameraSystemBars()
     val context = LocalContext.current
     var hasCamera by remember { mutableStateOf(
@@ -40,6 +47,7 @@ fun WorkoutSessionScreen(exercise: Exercise, onBack: () -> Unit, onFinish: () ->
     var completed by rememberSaveable(exercise.name) { mutableStateOf(false) }
     var confirmFinish by rememberSaveable { mutableStateOf(false) }
     var tracking by remember { mutableStateOf(false) }
+    var cameraStatus by remember { mutableStateOf(PoseCameraStatus()) }
     val totalSets = exercise.defaultSets
     val targetReps = exercise.defaultReps
     val progress by animateFloatAsState((reps.toFloat() / targetReps).coerceIn(0f, 1f), label = "Set progress")
@@ -60,7 +68,8 @@ fun WorkoutSessionScreen(exercise: Exercise, onBack: () -> Unit, onFinish: () ->
     Box(Modifier.fillMaxSize().background(Ink)) {
         if (hasCamera) PoseCamera(
             modifier = Modifier.fillMaxSize(),
-            onPose = { result -> tracking = result.landmarks.count { it.visibility > .5f } >= 8 }
+            onStatus = { cameraStatus = it }, onTrackingLost = { tracking = false },
+            onPose = { result -> tracking = result.landmarks.count { (it.visibility ?: 0f) > .5f } >= 8 }
         )
         CameraScrim()
         BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -118,6 +127,7 @@ fun WorkoutSessionScreen(exercise: Exercise, onBack: () -> Unit, onFinish: () ->
                                 when {
                                     completed -> "Session complete"
                                     isPaused -> "Session paused"
+                                    !cameraStatus.ready -> cameraStatus.message
                                     tracking -> "Pose detected"
                                     else -> "Step into the frame"
                                 },
@@ -136,7 +146,7 @@ fun WorkoutSessionScreen(exercise: Exercise, onBack: () -> Unit, onFinish: () ->
                     )
                     Spacer(Modifier.height(Space.Md))
                     Text(
-                        "Live pose overlay. Repetition progress currently uses a timer.",
+                        "Timed demo — movement is not counted. Live pose overlay only.",
                         style = MaterialTheme.typography.bodySmall, color = CameraInk.copy(alpha = .8f)
                     )
                     Spacer(Modifier.height(Space.Lg))
@@ -163,7 +173,7 @@ fun WorkoutSessionScreen(exercise: Exercise, onBack: () -> Unit, onFinish: () ->
         title = { Text("Finish this workout?") },
         text = { Text("Save this session to your workout history and return to your plan.") },
         confirmButton = {
-            TextButton(onClick = { confirmFinish = false; onFinish() }) { Text("Finish workout") }
+            TextButton(onClick = { confirmFinish = false; onFinish(null) }) { Text("Finish workout") }
         },
         dismissButton = { TextButton(onClick = { confirmFinish = false }) { Text("Keep going") } },
         containerColor = IvoryLight

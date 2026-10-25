@@ -245,6 +245,13 @@ private fun HistorySheet(history: List<WorkoutRecord>, onDismiss: () -> Unit) {
                 GlassCard(Modifier.fillMaxWidth()) {
                     Text(it.exerciseName, style = MaterialTheme.typography.titleMedium)
                     Text(dateFormat.format(Date(it.timestamp)), color = MutedInk)
+                    Text(when (it.kind) {
+                        WorkoutRecordKind.MEASURED -> "${it.totalReps} measured reps · ${it.completedSets}/${it.targetSets} full sets\n" +
+                            "Reps by set: ${it.perSetReps!!.joinToString()} · Target: ${it.targetReps}/set\n" +
+                            if (it.fullyCompleted == true) "Targets completed" else "Finished early"
+                        WorkoutRecordKind.DEMO -> "Timer demo — movement was not measured"
+                        WorkoutRecordKind.LEGACY -> "Legacy session — measured counts unavailable"
+                    }, color = MutedInk, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
