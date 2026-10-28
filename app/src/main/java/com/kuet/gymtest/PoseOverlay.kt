@@ -7,7 +7,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import com.kuet.gymtest.ui.theme.TrackingGreen
-import kotlin.math.max
 
 private const val MIN_VISIBILITY = 0.5f
 
@@ -17,26 +16,20 @@ fun PoseOverlay(pose: PoseResult?, modifier: Modifier = Modifier) {
         val result = pose ?: return@Canvas
         if (result.landmarks.isEmpty()) return@Canvas
 
-        // Matches PreviewView.ScaleType.FILL_CENTER
-        val scale = max(size.width / result.imageWidth, size.height / result.imageHeight)
-        val dx = (size.width - result.imageWidth * scale) / 2f
-        val dy = (size.height - result.imageHeight * scale) / 2f
-
-        fun point(l: PoseLandmark) = Offset(
-            l.x * result.imageWidth * scale + dx,
-            l.y * result.imageHeight * scale + dy
-        )
+        if (result.displayPoints.size != result.landmarks.size ||
+            result.displayPoints.any { !it.first.isFinite() || !it.second.isFinite() }) return@Canvas
+        fun point(i: Int) = result.displayPoints[i].let { Offset(it.first, it.second) }
 
         POSE_CONNECTIONS.forEach { (a, b) ->
             val la = result.landmarks.getOrNull(a)
             val lb = result.landmarks.getOrNull(b)
             if (la != null && lb != null &&
-                la.visibility > MIN_VISIBILITY && lb.visibility > MIN_VISIBILITY
+                (la.visibility ?: 0f) > MIN_VISIBILITY && (lb.visibility ?: 0f) > MIN_VISIBILITY
             ) {
                 drawLine(
                     color = TrackingGreen,
-                    start = point(la),
-                    end = point(lb),
+                    start = point(a),
+                    end = point(b),
                     strokeWidth = 8f,
                     cap = StrokeCap.Round
                 )
@@ -45,8 +38,8 @@ fun PoseOverlay(pose: PoseResult?, modifier: Modifier = Modifier) {
 
         POSE_CONNECTIONS.flatMap { listOf(it.first, it.second) }.distinct().forEach { i ->
             val l = result.landmarks.getOrNull(i)
-            if (l != null && l.visibility > MIN_VISIBILITY) {
-                drawCircle(color = Color.White, radius = 9f, center = point(l))
+            if (l != null && (l.visibility ?: 0f) > MIN_VISIBILITY) {
+                drawCircle(color = Color.White, radius = 9f, center = point(i))
             }
         }
     }
