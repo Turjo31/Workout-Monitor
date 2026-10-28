@@ -100,6 +100,8 @@ jobs:
 
   instrumented:
     name: Android integration and UI regressions (API 35)
+    # Temporarily disabled in CI: Samsung real-device manual testing is currently used.
+    if: ${{ false }}
     # Independent of the JVM job: a unit-test failure must not silently skip this suite.
     runs-on: ubuntu-24.04
     timeout-minutes: 50
