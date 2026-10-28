@@ -21,6 +21,8 @@ The user approved Checkpoint C on 2026-10-25, including implementation and verif
 
 Checkpoint D preparation authorization (2026-10-26) permits exactly one local checkpoint commit, `feat: implement bodyweight squat monitoring`, containing the reviewed implementation, tests and documentation. Check Git history before using this authorization; it is not permission for a second commit or amend. Push, merge, rebase, reset and main edits remain prohibited. Stop after the handoff and wait for explicit physical-device deployment approval. **Do not install, configure or launch an Android emulator** (limited RAM). No phone installation, uninstallation, data clearing or connected-test execution is authorized during preparation. Use `docs/samsung-device-testing.md` for the next Samsung session.
 
+CI authorization (2026-10-28): add `.github/workflows/android-ci.yml` on `feat/squat-monitoring`, with JVM/build checks and the existing instrumented suite on a **disposable GitHub-hosted emulator only**. This explicit request permits hosted emulator configuration; the local-computer emulator prohibition and Samsung deployment gate remain. Do not change application/test logic, dependencies or signing to obtain a CI pass. No commit, push, PR creation, merge or repository-settings changes are authorized for this task. Report hosted execution as unverified until actual CI results exist.
+
 - Checkpoint A: audit and plan presented; Phase 2 approved.
 - Checkpoint B: six context files presented and explicitly accepted by the user.
 - Checkpoint C: explicitly approved, including whole-session Reset, manual Next Set and measured workout history.

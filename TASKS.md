@@ -1,10 +1,14 @@
 # Development tracker
 
-Updated: 2026-10-26 (Asia/Dhaka). Active branch: `feat/squat-monitoring`, based on `main` at `e891615`. Checkpoint D authorizes one local commit containing this handoff; identify it by subject `feat: implement bodyweight squat monitoring` and verify its hash in Git. Status vocabulary: completed, in review, pending, blocked/deferred. A completed implementation item must identify its verification limits.
+Updated: 2026-10-28 (Asia/Dhaka). Active branch: `feat/squat-monitoring`, checkpoint `7acf936`, based on main at `e891615`. Status vocabulary: completed, in review, pending, blocked/deferred. A completed implementation item must identify its verification limits.
+
+Current CI update: 2026-10-28. Checkpoint commit `7acf936` is already present. The active request authorizes workflow/documentation edits only, with no commit/push/PR/merge/settings changes. Hosted emulator configuration is explicitly allowed; local emulator installation/configuration/launch and Samsung deployment remain prohibited without their separate authorization.
 
 ## Current gate
 
-Implementation and local verification are complete; instrumented execution and physical calibration remain pending. Checkpoint D permits one checkpoint commit and preparation only; deployment/connected tests await explicit approval. No emulator installation/configuration/launch. See the [verification report](docs/squat-monitoring-verification.md) and [Samsung test guide](docs/samsung-device-testing.md). No additional commit/amend, push, merge, rebase, reset or main edit is authorized.
+Implementation and earlier local verification are complete; hosted instrumented execution and physical calibration remain pending. The Checkpoint D commit exists; its authorization is consumed. Physical deployment/connected tests await approval. No local emulator installation/configuration/launch. See the [verification report](docs/squat-monitoring-verification.md) and [Samsung test guide](docs/samsung-device-testing.md). No additional commit/amend, push, merge, rebase, reset or main edit is authorized.
+
+For the CI request, `.github/workflows/android-ci.yml` is prepared locally and uncommitted; its actual GitHub execution remains pending. The newer emulator authorization applies only to disposable GitHub-hosted runners, not the developer's computer or phone.
 
 ## Prioritized work
 
@@ -24,6 +28,7 @@ Implementation and local verification are complete; instrumented execution and p
 | DEVICE-01 / P1 | Physical movement/camera checklist — pending. | Safe device and feature build. | Prior phone install failed on signing; no device connected on resume. Accuracy unverified. |
 | DOC-03 / P1 | Implementation handoff — completed. | Verified changes. | Current context, architecture, decisions, signing evidence and limitations recorded. |
 | PREP-01 / P1 | Final review and Samsung preparation — completed; one checkpoint commit authorized. | Checkpoint D. | No new critical code defect found; 40 fresh JVM tests pass; APK signatures checked. Guide has read-only certificate comparison, conditional deployment and 20 pending manual cases. No emulator or phone operation performed tonight. |
+| CI-01 / P1 | GitHub Actions workflow — configured and locally checked; hosted execution pending. | User-authorized later commit/push; GitHub-hosted runner. | Feature push/PR-main/manual triggers; PR merged revision; JDK 25 + SDK 37.0; all debug JVM tests/build/lint/APK tasks and complete hosted Android suite. XML/HTML/log artifacts retained on failure, actual counts summarized. No current CI pass claim. |
 | PUSHUP-01 / P2 | Independent push-up analyzer — deferred. | Squat foundation, future authorization/design. | Reuse analyzer contract and camera; do not implement in initial squat task. |
 | REGRESSION-01 / P2 | Broader integration/regression coverage — deferred. | Initial analyzer baseline. | Expand based on observed risks and failures; avoid a large speculative suite. |
 
@@ -57,6 +62,19 @@ Record device/OS, camera lens, orientation, lighting, approximate camera placeme
 - Finish early and at target sets/reps; confirm approved history behavior and existing navigation.
 
 ## Verification ledger
+
+CI configuration checks (2026-10-28):
+
+```powershell
+.\gradlew.bat --offline :app:tasks --all --no-configuration-cache --console=plain
+.\gradlew.bat --offline :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest :app:connectedDebugAndroidTest --dry-run --no-daemon --no-configuration-cache --max-workers=1 '-Pkotlin.compiler.execution.strategy=in-process' --console=plain
+```
+
+Both succeeded: task listing executed; dry run resolved the graph with every task SKIPPED by design (34s), performing no build/tests/install. Source inspection found eight local JVM test files and six instrumented classes. Instrumented tests use synthetic poses, Android bitmap/transforms and Compose screens; they do not require Samsung hardware or real camera input. The existing blur test requires API >=32, so hosted API 35 with SwiftShader is selected without excluding that test. First-run graphics/timing reliability remains unverified, and failures must surface. Exact hosted instrumented task is `:app:connectedDebugAndroidTest`; on a personal device it remains gated by deployment/test approval and data-safety review.
+
+Workflow validation passed: YAML triggers/read-only permissions/PR-event SHA/artifact conditions; eight Bash syntax checks; fourteen synthetic success/failure/error/skipped/missing-report scenarios for the two XML-summary snippets. These are CI configuration checks, not fourteen Android/JVM tests. No hosted CI run or local application-test rerun occurred. Historical 40-test passes below do not establish a current CI result. Application/test logic, signing, Gradle dependencies and main remain unchanged; no commit/push/PR/settings operation performed.
+
+The workflow runs `:app:testDebugUnitTest --rerun :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` with `--continue` (still fails on errors), then a separate independent job assembles the APKs and runs `:app:connectedDebugAndroidTest`. Both jobs use the wrapper, Temurin 25 and SDK package `platforms;android-37.0` with build-tools 36.0.0. Reports/logs upload via `always()` for 14 days; test totals are parsed from generated XML, not hardcoded. No release JVM task is registered by the inspected build. Manual workflow_dispatch is included but requires this workflow on the default branch; push/PR triggers can validate it first without any main edit. PRs with merge conflicts cannot receive a `pull_request` merge-revision run until conflicts are resolved.
 
 Checkpoint D preparation (2026-10-26 local; XML timestamps 2026-10-25T20:00:31Z):
 

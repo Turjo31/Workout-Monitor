@@ -1,10 +1,10 @@
 # Session handoff
 
-Updated: 2026-10-26 (Asia/Dhaka). Active branch: `feat/squat-monitoring`, based on `main` at `e891615`. This handoff belongs to the single authorized checkpoint commit `feat: implement bodyweight squat monitoring`; obtain its hash from Git history/the final Checkpoint D report, not a self-referential hash inside this file.
+Updated: 2026-10-28 (Asia/Dhaka). Active branch: `feat/squat-monitoring`; checkpoint `7acf936` (`feat: implement bodyweight squat monitoring`), based on main at `e891615`. The checkpoint already exists; do not reuse the earlier one-commit authorization.
 
 ## Current task and authorization
 
-Checkpoint C implementation is complete and locally verified. Checkpoint D authorizes exactly one local checkpoint commit and preparation for Samsung SM-G781W testing. Initial measured analysis is exclusively **Bodyweight Squat**. Inspect history before using the one-commit authorization; no additional commit/amend, push, merge, rebase, reset or discard is authorized. Stop after handoff: deployment needs explicit approval. Do not install/configure/launch an emulator, install/uninstall a phone app, clear phone data or run connected tests tonight.
+Current request: add GitHub Actions CI without committing/pushing/creating a PR or changing main/settings. Configure a disposable GitHub-hosted emulator for existing Android tests; do not install/configure/launch an emulator locally or interact with the Samsung. Application source, test logic, signing and Gradle dependencies must remain unchanged. Checkpoint C implementation and earlier local verification remain the baseline; physical-device deployment still requires approval.
 
 Read the six context files in the order prescribed by AGENTS.md, then inspect Git and relevant source. The approved design's original minimal-history option was superseded by the user's final requirements.
 
@@ -24,6 +24,7 @@ Read the six context files in the order prescribed by AGENTS.md, then inspect Gi
 - Resumed verification on 2026-10-26: confirmed sandbox/USER debug certificate mismatch. A stable-source build, 34 JVM tests, lint (0 errors/34 warnings) and test APK assembly succeeded before review fixes. The prior internal lint crash did not recur.
 - Review fixes: immediate watchdog/transform-loss epoch invalidation; resolved tracking errors can yield to actionable framing guidance; unavailable-lens retry rebinds; non-finite analyzer configuration is rejected. Added regression tests. Final outcomes are in TASKS.md.
 - Checkpoint D final source review found no new critical defect requiring changes. No production/test code changed during preparation. Forty JVM tests were freshly executed again; incremental build/lint/test APK tasks succeeded. Added `docs/samsung-device-testing.md` with certificate gates, Studio deployment precautions, Logcat commands and 20 ordered tests. No phone commands or emulator actions were performed during preparation.
+- CI preparation (2026-10-28): clean working tree at checkpoint `7acf936` before edits; no existing workflows. Added `.github/workflows/android-ci.yml` for feature pushes, PRs targeting main and manual dispatch. Checkout uses the event SHA (PR + main merge revision for PRs). Independent jobs run debug JVM/build/lint/test-APK tasks and the complete instrumented suite on hosted API 35 x86_64 with KVM/SwiftShader. Actual XML counts go to logs/step summaries; XML/HTML/lint/log artifacts upload even on failure. No tests are filtered or failures tolerated. CI has not executed.
 
 ## Relevant source paths
 
@@ -45,10 +46,12 @@ Build versions: `app/build.gradle.kts`, `gradle/libs.versions.toml`, wrapper/dae
 
 ## Verification snapshot
 
-Latest Checkpoint D command succeeded in 24s: 81 tasks, 2 executed/79 up-to-date. Forty JVM tests freshly executed (0 failures/errors/skips); debug APK and Android test APK assembly up-to-date, lint analysis/report up-to-date (0 errors/34 warnings). XML times: 2026-10-25T20:00:31Z, October 26 local. See TASKS.md and `docs/squat-monitoring-verification.md` for commands and earlier full verification. Four local APK signatures reverified; USER-key candidates remain uninstalled at `app/build/outputs/apk/verification-user-key/`. No real movement calibration has occurred.
+Current CI-edit verification: Gradle task listing and a five-task dry run succeeded; YAML/trigger/checkout/artifact checks, eight shell syntax checks and fourteen synthetic report-summary scenarios passed. These are configuration checks, not app test execution. SDK package metadata confirms `platforms;android-37.0` / build-tools 36.0.0; daemon criteria require JDK 25. No hosted CI run or new app/JVM/instrumented execution occurred in this task.
+
+Earlier Checkpoint D command succeeded in 24s: 81 tasks, 2 executed/79 up-to-date. Forty JVM tests freshly executed then (0 failures/errors/skips); APK/lint tasks up-to-date (0 errors/34 warnings). XML times: 2026-10-25T20:00:31Z. See TASKS.md and `docs/squat-monitoring-verification.md`. USER-key APK candidates remain ignored build artifacts; no movement calibration has occurred.
 
 ## Next actions
 
-1. Wait for the user's approval to begin phone verification/deployment; confirm the checkpoint hash and branch. Do not create an emulator.
-2. Follow `docs/samsung-device-testing.md`: identify SM-G781W and installed certificate read-only; compare exact candidate. Stop on mismatch or a higher installed version. Seek separate test-ID approval if needed; matching signatures do not guarantee saved-instance history survives an update.
-3. After explicit deployment approval, complete the ordered manual checklist and capture evidence. Connected tests need their own approval and data-safety review. No accuracy claim or merge until physical acceptance is evaluated; further commits/push/merge require new authorization.
+1. Review the uncommitted workflow/docs. A user-authorized commit/push is needed before this new workflow can run; do not perform it under the CI-edit request. Inspect the first hosted job logs/artifacts rather than assuming previous local test counts apply.
+2. Hosted instrumentation is configured via `:app:connectedDebugAndroidTest`; graphics/worker timing reliability remains unverified until the first run. Do not filter/skip failing tests to turn CI green. Manual dispatch requires the workflow to be present on the default branch; feature push/PR triggers are the initial route without modifying main.
+3. Physical Samsung camera/movement validation remains separate: follow `docs/samsung-device-testing.md` only after deployment approval. Installed-certificate comparison, both-lens alignment, lifecycle and real squat calibration remain pending. No local emulator or phone deployment is authorized by the hosted CI request.

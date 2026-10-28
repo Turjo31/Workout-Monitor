@@ -1,0 +1,202 @@
+name: Android CI
+
+on:
+  push:
+    branches: [feat/squat-monitoring]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  unit-and-build:
+    name: JVM tests, debug build and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      # On pull_request, github.sha is GitHub's PR + target-branch merge commit.
+      # Do not replace it with pull_request.head.sha: that would miss integration conflicts.
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Record tested revision
+        run: git show --no-patch --format=fuller HEAD
+
+      # gradle/gradle-daemon-jvm.properties requires 25; Java bytecode still targets 11.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0'
+
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      # gradlew is tracked as 100644, so invoke it with bash instead of changing its mode.
+      # --continue preserves independent build/lint results while still failing on any error.
+      - name: Run all debug JVM tests, assemble app/test APKs and lint
+        id: checks
+        run: |
+          mkdir -p app/build/ci-logs
+          bash ./gradlew :app:testDebugUnitTest --rerun :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest \
+            --continue --no-daemon --no-configuration-cache --max-workers=2 \
+            -Pkotlin.compiler.execution.strategy=in-process --stacktrace --console=plain \
+            2>&1 | tee app/build/ci-logs/unit-build-lint.log
+
+      - name: Report actual JVM test counts
+        if: always()
+        env:
+          TEST_TASK_OUTCOME: ${{ steps.checks.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          reports = sorted(Path('app/build/test-results/testDebugUnitTest').glob('TEST-*.xml'))
+          cases = [case for report in reports for case in ET.parse(report).getroot().iter('testcase')]
+          counts = {'tests': len(cases), 'failures': sum(c.find('failure') is not None for c in cases),
+                    'errors': sum(c.find('error') is not None for c in cases),
+                    'skipped': sum(c.find('skipped') is not None for c in cases)}
+          message = f"JVM XML reports: {len(reports)}; actual results: {counts}"
+          if not reports:
+              message += '\nNo test XML was produced; no passing tests can be claimed.'
+          print(message)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write(message + '\n')
+          if counts['failures'] or counts['errors'] or (not cases and os.environ['TEST_TASK_OUTCOME'] == 'success'):
+              raise SystemExit(1)
+          PY
+
+      - name: Upload JVM results, lint reports and build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-build-lint-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/reports/lint-results-debug.*
+            app/build/ci-logs/
+
+  instrumented:
+    name: Android integration and UI regressions (API 35)
+    # Independent of the JVM job: a unit-test failure must not silently skip this suite.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Record tested revision
+        run: git show --no-patch --format=fuller HEAD
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0'
+
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      # Finish compilation before booting the emulator to reduce peak RAM use.
+      - name: Assemble instrumented-test artifacts
+        run: |
+          mkdir -p app/build/ci-logs
+          bash ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest \
+            --no-daemon --no-configuration-cache --max-workers=2 \
+            -Pkotlin.compiler.execution.strategy=in-process --stacktrace --console=plain \
+            2>&1 | tee app/build/ci-logs/instrumented-build.log
+
+      # Runs only on this disposable GitHub-hosted VM, never on the developer's PC/phone.
+      - name: Enable hosted-runner KVM access
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -r /dev/kvm && test -w /dev/kvm
+
+      # API >=32 includes GlassBackdropTest's existing RenderEffect/blur assertion.
+      # No class filters, retry-to-pass, ignoreFailures or continue-on-error.
+      - name: Run the complete Android test suite on the hosted emulator
+        id: device-tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          cores: 2
+          ram-size: 2048M
+          disable-linux-hw-accel: false
+          disable-animations: true
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: >-
+            bash -o pipefail -c 'bash ./gradlew :app:connectedDebugAndroidTest
+            --no-daemon --no-configuration-cache --max-workers=1
+            -Pkotlin.compiler.execution.strategy=in-process --stacktrace --console=plain
+            2>&1 | tee app/build/ci-logs/instrumented-tests.log'
+
+      - name: Report actual instrumented test counts
+        if: always()
+        env:
+          TEST_TASK_OUTCOME: ${{ steps.device-tests.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          reports = sorted(Path('app/build/outputs/androidTest-results/connected').rglob('TEST-*.xml'))
+          cases = [case for report in reports for case in ET.parse(report).getroot().iter('testcase')]
+          counts = {'tests': len(cases), 'failures': sum(c.find('failure') is not None for c in cases),
+                    'errors': sum(c.find('error') is not None for c in cases),
+                    'skipped': sum(c.find('skipped') is not None for c in cases)}
+          message = f"Instrumented XML reports: {len(reports)}; actual results: {counts}"
+          if not reports:
+              message += '\nNo test XML was produced; no passing tests can be claimed.'
+          print(message)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write(message + '\n')
+          if counts['failures'] or counts['errors'] or (not cases and os.environ['TEST_TASK_OUTCOME'] == 'success'):
+              raise SystemExit(1)
+          PY
+
+      - name: Upload instrumented results, UI reports and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-api35-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/reports/androidTests/connected/
+            app/build/ci-logs/
