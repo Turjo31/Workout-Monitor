@@ -11,8 +11,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
 
-data class WorkoutUiState(val progress: WorkoutProgress? = null, val analysis: SquatAnalysisResult? = null)
-
+data class WorkoutUiState(val progress: WorkoutProgress? = null, val analysis: ExerciseAnalysisResult? = null)
 /** One Activity-retained owner; no camera, Activity, View or lifecycle references. */
 class WorkoutSessionViewModel internal constructor(
     private val saved: SavedStateHandle, private val worker: ExecutorService, private val main: Handler
@@ -22,7 +21,7 @@ class WorkoutSessionViewModel internal constructor(
     private val pending = AtomicBoolean(false)
     private val overflow = AtomicBoolean(false)
     private val closed = AtomicBoolean(false)
-    private val analyzer = SquatAnalyzer()
+    @Volatile private var analyzer: ExerciseAnalyzer = SquatAnalyzer()
     private val feedback = FeedbackPresenter()
     private var controller: WorkoutSessionController? = null
     private val mutableState = MutableStateFlow(WorkoutUiState())
@@ -32,10 +31,11 @@ class WorkoutSessionViewModel internal constructor(
         if (closed.get()) return@synchronized
         if (controller?.state?.exerciseName == name && controller?.state?.status != SessionStatus.FINISHED) return@synchronized
         controller = WorkoutSessionController(name, sets, reps, WorkoutProgressCodec.decode(saved.get<ArrayList<Any>>("progress")))
+        analyzer = MeasuredExercises.create(name)
         worker.execute { analyzer.reset(); feedback.reset() }
         publish()
     }
-    private fun publish(analysis: SquatAnalysisResult? = null) {
+    private fun publish(analysis: ExerciseAnalysisResult? = null) {
         val snapshot = WorkoutUiState(controller?.state, analysis)
         mutableState.value = snapshot
         val save = Runnable { if (mutableState.value == snapshot) saved["progress"] = snapshot.progress?.let(WorkoutProgressCodec::encode) }
@@ -70,7 +70,7 @@ class WorkoutSessionViewModel internal constructor(
                     if (!synchronized(lock) { controller?.accepts(frame.key) == true }) return@execute
                     val result = analyzer.processFrame(frame)
                     synchronized(lock) {
-                        if (controller?.accept(result) == true) publish(result.copy(feedback = feedback.present(result)))
+                        if (controller?.accept(result) == true) publish(result.withFeedback(feedback.present(result)))
                     }
                 } finally { pending.set(false) }
             }

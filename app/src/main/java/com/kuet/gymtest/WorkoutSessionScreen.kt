@@ -26,11 +26,12 @@ import com.kuet.gymtest.ui.theme.*
 import kotlinx.coroutines.delay
 import com.kuet.gymtest.session.WorkoutSessionViewModel
 import com.kuet.gymtest.session.WorkoutSummary
+import com.kuet.gymtest.analysis.MeasuredExercises
 
 @Composable
 fun WorkoutSessionScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel,
     onBack: () -> Unit, onFinish: (WorkoutSummary?) -> Unit) {
-    if (exercise.name == "Bodyweight Squat") {
+    if (MeasuredExercises.supports(exercise.name)) {
         MeasuredWorkoutScreen(exercise, viewModel, onBack, onFinish)
         return
     }

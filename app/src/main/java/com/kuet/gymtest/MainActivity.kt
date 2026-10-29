@@ -27,6 +27,7 @@ import com.kuet.gymtest.ui.components.AppBackground
 import com.kuet.gymtest.ui.components.LocalGlassBackdrop
 import com.kuet.gymtest.ui.components.WorkoutBottomNavigation
 import com.kuet.gymtest.ui.theme.GymTestTheme
+import com.kuet.gymtest.analysis.MeasuredExercises
 
 enum class Tab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Outlined.Home),
@@ -82,9 +83,9 @@ fun AppNavigation(workoutSession: WorkoutSessionViewModel) {
                     onBack = { workoutSession.discard(); activeExerciseName = null },
                     onFinish = { summary ->
                         if (activeExerciseName != null) {
-                            val record = if (exercise.name == "Bodyweight Squat") summary?.let(WorkoutRecord::measured)
-                                else WorkoutRecord(System.currentTimeMillis(), exercise.name,
-                                    java.util.UUID.randomUUID().toString(), WorkoutRecordKind.DEMO)
+                            val record = if (MeasuredExercises.supports(exercise.name)) summary?.let(WorkoutRecord::measured)   // was: exercise.name == "Bodyweight Squat"
+                            else WorkoutRecord(System.currentTimeMillis(), exercise.name,
+                                java.util.UUID.randomUUID().toString(), WorkoutRecordKind.DEMO)
                             if (record != null) history = WorkoutHistoryCodec.appendOnce(history, record)
                             workoutSession.discard()
                             activeExerciseName = null

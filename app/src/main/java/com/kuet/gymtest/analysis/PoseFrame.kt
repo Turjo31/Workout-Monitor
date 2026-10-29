@@ -27,7 +27,15 @@ enum class Feedback(val text: String, val priority: Int) {
     LOWER("Lower into the squat", 4),
     RETURN("Return to standing", 4),
     SHALLOW("Try lowering farther on the next repetition", 4),
-    COUNTED("Repetition counted", 5)
+    COUNTED("Repetition counted", 5),
+
+    PUSH_READY("Get into a plank to begin", 4),
+
+    PUSH_LOWER("Lower your chest", 4),
+
+    PUSH_UP("Press back up", 4),
+    PUSH_SHALLOW("Try lowering your chest farther next time", 4)
+
 }
 
 enum class DiscontinuityReason { TRACKING, GAP, EPOCH, PAUSE, CAMERA, OVERFLOW }

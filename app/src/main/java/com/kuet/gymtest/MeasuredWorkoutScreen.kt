@@ -30,14 +30,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.kuet.gymtest.analysis.DepthStatus
+import com.kuet.gymtest.analysis.statusLine
 import com.kuet.gymtest.session.*
 import com.kuet.gymtest.ui.components.*
 import com.kuet.gymtest.ui.theme.*
 
 @Composable
 fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel,
-    onBack: () -> Unit, onFinish: (WorkoutSummary?) -> Unit) {
+                          onBack: () -> Unit, onFinish: (WorkoutSummary?) -> Unit) {
     CameraSystemBars()
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
@@ -75,8 +75,12 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
     BackHandler(onBack = leave)
     val progress by animateFloatAsState(p.currentReps.toFloat() / p.targetReps, label = "Set progress")
     val instruction = when {
-        !hasCamera -> "Allow camera access to monitor your squat"
+        !hasCamera -> "Allow camera access to monitor your ${exercise.name.lowercase()}"
         !camera.ready -> camera.message
+        p.status == SessionStatus.SETUP -> if (exercise.name == "Push-up")
+            "Place the camera at your side, plank position, whole body visible"
+        else "Stand sideways with your head and feet visible"
+
         p.status == SessionStatus.SETUP -> "Stand sideways with your head and feet visible"
         p.status == SessionStatus.PAUSED -> "Paused — Resume when you are ready"
         p.status == SessionStatus.BETWEEN_SETS -> "Set complete — press Next Set when ready"
@@ -101,7 +105,7 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
                         Spacer(Modifier.width(Space.Md))
                         Column(Modifier.weight(1f)) {
                             Text(exercise.name, style = MaterialTheme.typography.titleLarge, color = CameraInk)
-                            Text("Side-view squat monitoring", color = CameraInk.copy(alpha = .82f), style = MaterialTheme.typography.bodySmall)
+                            Text("Side-view ${exercise.name.lowercase()} monitoring", color = CameraInk.copy(alpha = .82f), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                     Spacer(Modifier.height(Space.Lg))
@@ -123,9 +127,8 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
                     Spacer(Modifier.height(Space.Md))
                     Text(when {
                         p.status != SessionStatus.RUNNING -> "${p.totalReps} total reps · ${p.completedSets} completed sets"
-                        ui.analysis?.trackingValid != true -> "Waiting for valid squat tracking"
-                        else -> "${ui.analysis!!.phase.name.lowercase().replace('_', ' ')} · " +
-                            if (ui.analysis!!.depth == DepthStatus.TARGET_REACHED) "Target bend reached" else "Depth estimate: above target"
+                        ui.analysis?.trackingValid != true -> "Waiting for valid tracking"
+                        else -> ui.analysis!!.statusLine()
                     }, color = CameraInk.copy(alpha = .85f), style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(Space.Md))
                     LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(5.dp),
@@ -144,7 +147,7 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
                                 else -> Unit
                             }
                         }, enabled = p.status == SessionStatus.RUNNING || (hasCamera && camera.ready &&
-                            p.status !in listOf(SessionStatus.COMPLETE, SessionStatus.FINISHED)),
+                                p.status !in listOf(SessionStatus.COMPLETE, SessionStatus.FINISHED)),
                             modifier = Modifier.weight(1f).heightIn(min = 54.dp), shape = WorkoutShapes.Control,
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = CameraInk)) {
                             Text(when (p.status) {
@@ -181,10 +184,10 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
     if (confirmFinish) AlertDialog(onDismissRequest = { confirmFinish = false },
         title = { Text("Finish this workout?") }, text = {
             Text(if (p.totalReps == 0) "No valid repetitions completed. No history entry will be saved."
-                else "${p.totalReps} measured reps · ${p.completedSets} fully completed sets.\n" +
+            else "${p.totalReps} measured reps · ${p.completedSets} fully completed sets.\n" +
                     "Reps by set: ${p.perSet.joinToString()}.\n" + if (p.fullyCompleted) "All targets reached." else "This workout will be saved as finished early.")
         }, confirmButton = { TextButton(onClick = {
-            if (!delivered) { delivered = true; confirmFinish = false; onFinish(viewModel.finish(System.currentTimeMillis())) }
+            if (!delivered) { delivered = true; confirmFinish = false; (viewModel.finish(System.currentTimeMillis())) }
         }) { Text("Finish workout") } },
         dismissButton = { TextButton(onClick = { confirmFinish = false }) { Text("Keep going") } }, containerColor = IvoryLight)
     if (confirmExit) AlertDialog(onDismissRequest = { confirmExit = false }, title = { Text("Leave this workout?") },
