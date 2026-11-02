@@ -11,18 +11,24 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
 
-data class WorkoutUiState(val progress: WorkoutProgress? = null, val analysis: SquatAnalysisResult? = null)
+data class WorkoutUiState(
+    val progress: WorkoutProgress? = null,
+    val analysis: ExerciseAnalysisResult? = null,
+    val displayedFeedback: AnalysisFeedback? = null
+)
 
 /** One Activity-retained owner; no camera, Activity, View or lifecycle references. */
 class WorkoutSessionViewModel internal constructor(
-    private val saved: SavedStateHandle, private val worker: ExecutorService, private val main: Handler
+    private val saved: SavedStateHandle, private val worker: ExecutorService, private val main: Handler,
+    private val findMonitor: (String) -> ExerciseMonitorDefinition? = ExerciseMonitorRegistry::find
 ) : ViewModel() {
     constructor(saved: SavedStateHandle) : this(saved, Executors.newSingleThreadExecutor(), Handler(Looper.getMainLooper()))
     private val lock = Any()
     private val pending = AtomicBoolean(false)
     private val overflow = AtomicBoolean(false)
     private val closed = AtomicBoolean(false)
-    private val analyzer = SquatAnalyzer()
+    // Created/replaced/reset only on the serialized worker.
+    private var analyzer: ExerciseAnalyzer? = null
     private val feedback = FeedbackPresenter()
     private var controller: WorkoutSessionController? = null
     private val mutableState = MutableStateFlow(WorkoutUiState())
@@ -31,12 +37,13 @@ class WorkoutSessionViewModel internal constructor(
     fun open(name: String, sets: Int, reps: Int) = synchronized(lock) {
         if (closed.get()) return@synchronized
         if (controller?.state?.exerciseName == name && controller?.state?.status != SessionStatus.FINISHED) return@synchronized
+        val definition = requireNotNull(findMonitor(name)) { "No measured analyzer registered for $name" }
         controller = WorkoutSessionController(name, sets, reps, WorkoutProgressCodec.decode(saved.get<ArrayList<Any>>("progress")))
-        worker.execute { analyzer.reset(); feedback.reset() }
+        worker.execute { analyzer = definition.createAnalyzer(); analyzer?.reset(); feedback.reset() }
         publish()
     }
-    private fun publish(analysis: SquatAnalysisResult? = null) {
-        val snapshot = WorkoutUiState(controller?.state, analysis)
+    private fun publish(analysis: ExerciseAnalysisResult? = null, displayedFeedback: AnalysisFeedback? = null) {
+        val snapshot = WorkoutUiState(controller?.state, analysis, displayedFeedback)
         mutableState.value = snapshot
         val save = Runnable { if (mutableState.value == snapshot) saved["progress"] = snapshot.progress?.let(WorkoutProgressCodec::encode) }
         if (Looper.myLooper() == Looper.getMainLooper()) save.run() else main.post(save)
@@ -47,7 +54,7 @@ class WorkoutSessionViewModel internal constructor(
         controller?.action()
         if (before == controller?.state) return@synchronized
         // Closing/changing the epoch is immediate, before an in-flight analysis can commit.
-        worker.execute { analyzer.reset(); feedback.reset() }
+        worker.execute { analyzer?.reset(); feedback.reset() }
         publish()
     }
     fun start() = command { start() }
@@ -66,11 +73,11 @@ class WorkoutSessionViewModel internal constructor(
             if (!pending.compareAndSet(false, true)) { overflow.set(true); return }
             worker.execute {
                 try {
-                    if (overflow.getAndSet(false)) analyzer.invalidateTracking(DiscontinuityReason.OVERFLOW)
+                    if (overflow.getAndSet(false)) analyzer?.invalidateTracking(DiscontinuityReason.OVERFLOW)
                     if (!synchronized(lock) { controller?.accepts(frame.key) == true }) return@execute
-                    val result = analyzer.processFrame(frame)
+                    val result = analyzer?.processFrame(frame) ?: return@execute
                     synchronized(lock) {
-                        if (controller?.accept(result) == true) publish(result.copy(feedback = feedback.present(result)))
+                        if (controller?.accept(result) == true) publish(result, feedback.present(result))
                     }
                 } finally { pending.set(false) }
             }
@@ -82,7 +89,7 @@ class WorkoutSessionViewModel internal constructor(
     fun finish(timestamp: Long): WorkoutSummary? = synchronized(lock) {
         if (closed.get()) return@synchronized null
         val result = controller?.finish(timestamp)
-        worker.execute { analyzer.reset() }
+        worker.execute { analyzer?.reset(); feedback.reset() }
         publish()
         result
     }
@@ -90,7 +97,7 @@ class WorkoutSessionViewModel internal constructor(
         if (closed.get()) return@synchronized
         controller = null
         saved.remove<ArrayList<Any>>("progress")
-        worker.execute { analyzer.reset() }
+        worker.execute { analyzer = null; feedback.reset() }
         publish()
     }
     override fun onCleared() = synchronized(lock) { closed.set(true); worker.shutdown() }

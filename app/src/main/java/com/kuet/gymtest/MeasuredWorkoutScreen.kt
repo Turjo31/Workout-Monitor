@@ -30,14 +30,15 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.kuet.gymtest.analysis.DepthStatus
+import com.kuet.gymtest.analysis.ExerciseMonitorDefinition
 import com.kuet.gymtest.session.*
 import com.kuet.gymtest.ui.components.*
 import com.kuet.gymtest.ui.theme.*
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel,
-    onBack: () -> Unit, onFinish: (WorkoutSummary?) -> Unit) {
+    onBack: () -> Unit, onFinish: (WorkoutSummary?) -> Unit, monitor: ExerciseMonitorDefinition) {
     CameraSystemBars()
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
@@ -75,13 +76,13 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
     BackHandler(onBack = leave)
     val progress by animateFloatAsState(p.currentReps.toFloat() / p.targetReps, label = "Set progress")
     val instruction = when {
-        !hasCamera -> "Allow camera access to monitor your squat"
+        !hasCamera -> "Allow camera access to monitor your movement"
         !camera.ready -> camera.message
-        p.status == SessionStatus.SETUP -> "Stand sideways with your head and feet visible"
+        p.status == SessionStatus.SETUP -> monitor.setupGuidance
         p.status == SessionStatus.PAUSED -> "Paused — Resume when you are ready"
         p.status == SessionStatus.BETWEEN_SETS -> "Set complete — press Next Set when ready"
         p.status == SessionStatus.COMPLETE -> "Workout complete — Finish to save your results"
-        else -> ui.analysis?.feedback?.text ?: "Pose unclear — adjust the camera or lighting"
+        else -> ui.displayedFeedback?.text ?: "Pose unclear — adjust the camera or lighting"
     }
     Box(Modifier.fillMaxSize().background(Ink)) {
         if (hasCamera) PoseCamera(Modifier.fillMaxSize(), lens = lens, retry = retry,
@@ -101,13 +102,13 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
                         Spacer(Modifier.width(Space.Md))
                         Column(Modifier.weight(1f)) {
                             Text(exercise.name, style = MaterialTheme.typography.titleLarge, color = CameraInk)
-                            Text("Side-view squat monitoring", color = CameraInk.copy(alpha = .82f), style = MaterialTheme.typography.bodySmall)
+                            Text(monitor.monitoringLabel, color = CameraInk.copy(alpha = .82f), style = MaterialTheme.typography.bodySmall)
                         }
                     }
-                    Spacer(Modifier.height(Space.Lg))
+                    Spacer(Modifier.height(Space.Sm))
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Md)) {
-                        GlassCameraStat("${p.currentReps} / ${p.targetReps}", "Measured reps", Modifier.weight(1f))
-                        GlassCameraStat("${p.currentSet} / ${p.targetSets}", "Current set", Modifier.weight(1f))
+                        GlassCameraStat("${p.currentReps} / ${p.targetReps}", "Measured reps", Modifier.weight(1f), compact = true)
+                        GlassCameraStat("${p.currentSet} / ${p.targetSets}", "Current set", Modifier.weight(1f), compact = true)
                     }
                 }
                 Spacer(Modifier.height(Space.Xxl))
@@ -118,24 +119,29 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
                     }) { Text("Open app settings", color = CameraInk) }
                 }
                 Spacer(Modifier.height(Space.Xl))
-                GlassCard(Modifier.fillMaxWidth(), fill = CameraGlass, border = Color.White.copy(alpha = .3f)) {
+                GlassCard(Modifier.fillMaxWidth(), fill = CameraGlass, border = Color.White.copy(alpha = .3f),
+                    padding = PaddingValues(Space.Md)) {
                     Text(instruction, color = CameraInk, style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(Space.Md))
+                    Spacer(Modifier.height(Space.Xs))
                     Text(when {
                         p.status != SessionStatus.RUNNING -> "${p.totalReps} total reps · ${p.completedSets} completed sets"
-                        ui.analysis?.trackingValid != true -> "Waiting for valid squat tracking"
-                        else -> "${ui.analysis!!.phase.name.lowercase().replace('_', ' ')} · " +
-                            if (ui.analysis!!.depth == DepthStatus.TARGET_REACHED) "Target bend reached" else "Depth estimate: above target"
+                        ui.analysis?.trackingValid != true -> "Waiting for valid tracking"
+                        else -> ui.analysis!!.presentation.let { listOfNotNull(it.phaseLabel, it.detail).joinToString(" · ") }
                     }, color = CameraInk.copy(alpha = .85f), style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(Space.Md))
                     LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(5.dp),
                         color = TrackingGreen, trackColor = Color.White.copy(alpha = .2f))
                     Spacer(Modifier.height(Space.Md))
-                    Text("2D movement estimate. Keep a side view; thresholds need device calibration.",
-                        style = MaterialTheme.typography.bodySmall, color = CameraInk.copy(alpha = .8f))
-                    Spacer(Modifier.height(Space.Lg))
-                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Md)) {
-                        OutlinedButton(onClick = {
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.Xs),
+                        verticalArrangement = Arrangement.spacedBy(Space.Xs)) {
+                        val actionLabel = when (p.status) {
+                            SessionStatus.SETUP -> "Start"
+                            SessionStatus.RUNNING -> "Pause"
+                            SessionStatus.PAUSED -> "Resume"
+                            SessionStatus.BETWEEN_SETS -> "Next Set"
+                            else -> "Complete"
+                        }
+                        val action = {
                             when (p.status) {
                                 SessionStatus.SETUP -> viewModel.start()
                                 SessionStatus.RUNNING -> viewModel.pause()
@@ -143,31 +149,36 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
                                 SessionStatus.BETWEEN_SETS -> viewModel.nextSet()
                                 else -> Unit
                             }
-                        }, enabled = p.status == SessionStatus.RUNNING || (hasCamera && camera.ready &&
-                            p.status !in listOf(SessionStatus.COMPLETE, SessionStatus.FINISHED)),
-                            modifier = Modifier.weight(1f).heightIn(min = 54.dp), shape = WorkoutShapes.Control,
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = CameraInk)) {
-                            Text(when (p.status) {
-                                SessionStatus.SETUP -> "Start"
-                                SessionStatus.RUNNING -> "Pause"
-                                SessionStatus.PAUSED -> "Resume"
-                                SessionStatus.BETWEEN_SETS -> "Next Set"
-                                else -> "Complete"
-                            })
                         }
-                        WorkoutPrimaryButton("Finish", { viewModel.pause(); confirmFinish = true }, Modifier.weight(1f), icon = Icons.Default.Stop)
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        TextButton(onClick = { viewModel.pause(); confirmReset = true }) { Text("Reset", color = CameraInk) }
-                        TextButton(onClick = {
+                        val actionEnabled = p.status == SessionStatus.RUNNING || (hasCamera && camera.ready &&
+                            p.status !in listOf(SessionStatus.COMPLETE, SessionStatus.FINISHED))
+                        if (p.status == SessionStatus.BETWEEN_SETS) {
+                            TextButton(onClick = action, enabled = actionEnabled,
+                                contentPadding = PaddingValues(horizontal = Space.Sm),
+                                colors = ButtonDefaults.textButtonColors(contentColor = CameraInk)) { Text(actionLabel) }
+                        } else {
+                            FilledTonalIconButton(onClick = action, enabled = actionEnabled, modifier = Modifier.size(48.dp),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = CameraInk, contentColor = Ink)) {
+                                Icon(if (p.status == SessionStatus.RUNNING) Icons.Default.Pause else Icons.Default.PlayArrow, actionLabel)
+                            }
+                        }
+                        IconButton(onClick = { viewModel.pause(); confirmReset = true }, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.Default.RestartAlt, "Reset workout", tint = CameraInk)
+                        }
+                        IconButton(onClick = {
                             viewModel.pause(); camera = PoseCameraStatus(false, "Switching camera…", camera.lens)
                             lens = 1 - camera.lens
                             retry++ // Also rebind when a previous unavailable-lens request fell back.
-                        }, enabled = camera.ready) {
-                            Text(if (camera.lens == CameraSelector.LENS_FACING_FRONT) "Front → Rear" else "Rear → Front", color = CameraInk)
+                        }, enabled = camera.ready, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.Default.Cameraswitch,
+                                if (camera.lens == CameraSelector.LENS_FACING_FRONT) "Switch to rear camera" else "Switch to front camera",
+                                tint = if (camera.ready) CameraInk else CameraInk.copy(alpha = .38f))
                         }
-                        if (!camera.ready && hasCamera) TextButton(onClick = { viewModel.pause(); retry++ }) { Text("Retry", color = CameraInk) }
+                        Button(onClick = { viewModel.pause(); confirmFinish = true }, shape = WorkoutShapes.Control,
+                            contentPadding = PaddingValues(horizontal = Space.Md),
+                            colors = ButtonDefaults.buttonColors(containerColor = Forest, contentColor = Color.White)) { Text("Finish") }
                     }
+                    if (!camera.ready && hasCamera) TextButton(onClick = { viewModel.pause(); retry++ }) { Text("Retry camera", color = CameraInk) }
                     if (camera.ready && camera.lens != lens) Text(camera.message,
                         color = CameraInk.copy(alpha = .85f), style = MaterialTheme.typography.bodySmall)
                 }

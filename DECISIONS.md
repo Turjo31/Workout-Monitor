@@ -1,5 +1,25 @@
 # Architecture decision log
 
+## ADR-008 — Registry-selected strategies and generic measured presentation
+
+- Date: 2026-11-01.
+- Status: User-approved plan; implemented on `refactor/exercise-monitoring`.
+- Problem: A reusable analyzer interface still had squat-specific callers in ViewModel, feedback, routing and UI, creating shared-file edits for each new exercise.
+- Selected approach: Exact-name registry of fresh analyzer factories and setup metadata; ordinary result/feedback interfaces; common phase/readiness/detail presentation; generic ViewModel and routing. Preserve the analyzer's three methods, squat counting rules and existing generic rep/set/history logic. Keep numeric feedback priorities compatible with existing tests.
+- Alternatives: Per-exercise UI/ViewModel branches; mutable singleton analyzers; plugin/DI framework; full catalog ID migration. These add coupling or scope without a present need.
+- Reasoning: New rep/set analyzers can be independent strategies registered at one composition point. Camera and session/history internals remain reusable. Exact names preserve current catalog compatibility.
+- Consequences: Registration is still a shared edit and may cause Git conflicts. Every analyzer must implement readiness/continuity/event contracts and its own tests. Duration/hold-based exercise semantics need a future design. No extra production analyzer is implemented.
+
+## ADR-009 — Compact measured camera controls
+
+- Date: 2026-11-01.
+- Status: Approved by user; implemented, device visual review pending.
+- Problem: Stats, explanatory copy and two control rows covered too much of the live preview.
+- Selected approach: Opt-in compact stat cards, smaller feedback-card padding, one row with accessible Start/Pause/Resume, Reset and camera icons; retain Next Set/Finish labels and reset confirmation. Remove the persistent 2D-estimate paragraph while preserving limitations in docs.
+- Alternatives: Full camera-screen redesign; hiding critical feedback; removing confirmation. Not selected.
+- Reasoning: Reduces occupied space using the existing theme and components.
+- Consequences: Icon discoverability, small screens and large font sizes need physical UI checks. No counting or camera transformation change.
+
 This log begins on 2026-10-25. It records decisions confirmed in the current work; it does not reconstruct earlier undocumented decisions. Accepted design direction does not imply implementation or authorization to bypass checkpoints.
 
 Current status: Checkpoint C was explicitly approved on 2026-10-25. ADR-001/002 are implemented. ADR-004's canonical-pose/continuity/session policies are accepted and implemented, **except its minimal-history recommendation, superseded by ADR-005**. Earlier pending/proposed wording below is retained as the design-review record, not the current authorization gate.

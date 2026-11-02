@@ -50,10 +50,10 @@ fun CameraScrim() {
 }
 
 @Composable
-fun GlassCameraStat(value: String, label: String, modifier: Modifier = Modifier) {
+fun GlassCameraStat(value: String, label: String, modifier: Modifier = Modifier, compact: Boolean = false) {
     GlassCard(modifier, fill = CameraGlass, border = Color.White.copy(alpha = .28f),
-        shape = WorkoutShapes.Stat, padding = PaddingValues(Space.Lg)) {
-        Text(value, style = MaterialTheme.typography.headlineLarge, color = CameraInk)
+        shape = WorkoutShapes.Stat, padding = PaddingValues(if (compact) Space.Sm else Space.Lg)) {
+        Text(value, style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge, color = CameraInk)
         Text(label, style = MaterialTheme.typography.bodySmall, color = CameraInk.copy(alpha = .86f))
     }
 }

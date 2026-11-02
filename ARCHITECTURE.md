@@ -1,5 +1,17 @@
 # Technical architecture
 
+## Shared integration update — 2026-11-01
+
+`ExerciseMonitorRegistry.kt` is the single exact catalog-name registration point. Each `ExerciseMonitorDefinition` supplies setup guidance, a monitoring label and a factory that creates a fresh `ExerciseAnalyzer`. This is a small registry-backed Simple Factory; analyzers are the strategies. There is no mutable singleton analyzer or plugin framework.
+
+`ExerciseAnalyzer` methods remain unchanged. `ExerciseAnalysisResult` is now an ordinary interface, allowing implementations in exercise-specific packages. `AnalysisFeedback` exposes an exercise-owned stable key, text and shared numeric priority policy; `AnalysisPresentation` exposes phase key/label, readiness and optional detail. Typed squat phase/depth/metrics and the existing Feedback enum stay with `SquatAnalyzer`. Its counting algorithm and thresholds are unchanged.
+
+The ViewModel resolves a definition when opening a session and creates/replaces the analyzer on its single worker. All epoch/commit gates remain. `WorkoutUiState` holds a generic result plus separate stabilized feedback; it no longer copies a concrete squat result. `FeedbackPresenter` uses generic readiness/phase keys. UI routing and measured-history classification use the same registry. The controller, WorkoutRecord codec, HistoryStateSaver and Profile history already support arbitrary rep/set exercise names and need no modifications.
+
+The measured screen uses definition-owned setup/label text and result presentation without squat type checks. Compact stats are opt-in, so demo/standalone camera components retain their previous sizes. One primary guidance message, short detail, progress bar and icon controls reduce the bottom panel. Camera capture/inference/transforms/lifecycle files are unchanged.
+
+See [extension guide](docs/adding-exercise-analyzers.md) for the contract and team workflow. The earlier architecture below describes the pre-refactor implementation and audit; this section supersedes its concrete SquatAnalyzer coupling and routing descriptions.
+
 Updated on 2026-10-26 for `feat/squat-monitoring`, based on `e891615`. The implemented feature architecture below supersedes the pre-feature audit retained later in this file.
 
 ## Implemented squat architecture
