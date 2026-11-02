@@ -1,11 +1,7 @@
 name: Android CI
 
 on:
-  push:
-    branches: [feat/squat-monitoring]
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+  # Opt-in only: pushes and pull requests do not start CI.
   workflow_dispatch:
 
 permissions:
@@ -25,8 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
-      # On pull_request, github.sha is GitHub's PR + target-branch merge commit.
-      # Do not replace it with pull_request.head.sha: that would miss integration conflicts.
+      # Manual runs check the selected revision; no automatic PR merge check is performed.
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}

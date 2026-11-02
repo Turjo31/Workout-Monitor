@@ -1,5 +1,23 @@
 # Development tracker
 
+CI update (2026-11-02): automatic push/PR triggers removed at user request; workflow is manual-only locally. Existing jobs/reports retained, instrumented job still disabled. Trigger/diff checks passed; no CI or app tests executed for this trigger-only edit. Publication remains pending; earlier CI-trigger descriptions below are historical.
+
+## Current refactor — 2026-11-01
+
+Branch `refactor/exercise-monitoring`, based on clean main `1718a44`; branch creation and implementation explicitly approved. Changes remain uncommitted. Historical CI/feature-branch gates below no longer describe current Git state.
+
+| Work | Status / evidence |
+| --- | --- |
+| Registry and generic feedback/result/presentation | Implemented; only Bodyweight Squat registered. |
+| Generic ViewModel, routing and history selection | Implemented; existing controller/history schema/Profile remain unchanged. |
+| Compact measured camera UI | Implemented; reset confirmation and named Next Set/Finish retained; physical visual review pending. |
+| Existing baseline regression | Fresh JVM run passed: 40 tests, no failures/errors/skips; build successful in 53s. |
+| Extension regression tests | Four new JVM extension tests passed; total 44 tests, 0 failures/errors/skips. Android worker-switch test compiled but not executed. |
+| Final build/lint after power interruption | BUILD SUCCESSFUL in 2m37s; 6 executed/75 up-to-date. JVM and lint executed afresh; lint 0 errors/32 warnings. App/test APK assembly up-to-date. |
+| Physical testing | User reports prior squat counting worked on their phone. Refactored UI, large fonts, camera controls and full edge-case matrix remain pending. No device operation performed. |
+
+Next safe action: review the completed uncommitted diff; device visual/interaction testing requires deployment approval. `git diff --check` passed. No commit/push/merge or local emulator. Existing hosted instrumented workflow is disabled in the checked baseline, not a verified CI result. Exact final command and report paths are in [verification](docs/squat-monitoring-verification.md).
+
 Updated: 2026-10-28 (Asia/Dhaka). Active branch: `feat/squat-monitoring`, checkpoint `7acf936`, based on main at `e891615`. Status vocabulary: completed, in review, pending, blocked/deferred. A completed implementation item must identify its verification limits.
 
 Current CI update: 2026-10-28. Checkpoint commit `7acf936` is already present. The active request authorizes workflow/documentation edits only, with no commit/push/PR/merge/settings changes. Hosted emulator configuration is explicitly allowed; local emulator installation/configuration/launch and Samsung deployment remain prohibited without their separate authorization.

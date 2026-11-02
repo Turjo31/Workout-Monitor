@@ -1,5 +1,13 @@
 # Project requirements
 
+## Current scope update — 2026-11-01
+
+Approved and implemented on `refactor/exercise-monitoring`: reusable integration for future repetition/set-based analyzers, with one exact-name factory registration per exercise. Shared camera/session/history logic should not require per-exercise branches. Only Bodyweight Squat has production measured analysis; unregistered exercises retain labeled demos. New exercise algorithms are separate future work.
+
+Measured camera UI now uses compact stats and accessible icons for Start/Pause/Resume, Reset and switching lenses; Next Set and Finish retain labels. The persistent 2D-estimate paragraph is removed at the user's request. Existing session policies, reset confirmation, design tokens, navigation and measured history remain. The 2D measurement/calibration limitations still apply.
+
+The user reports successful squat counting on their own phone with the prior version. Full physical regression coverage and the new compact layout are not yet verified on device. The older feature-branch/approval statements below are historical.
+
 Last updated: 2026-10-26. Checkpoint C is approved; implementation is on `feat/squat-monitoring`, based on `main` at `e891615`. The current feature requirements/status below supersede the historical audit sections retained afterward.
 
 ## Current feature: implemented and locally verified; device calibration pending

@@ -1,5 +1,29 @@
 # Bodyweight Squat implementation and verification handoff
 
+## Shared integration refactor — 2026-11-01
+
+Branch: `refactor/exercise-monitoring`, created from clean main `1718a44` with the user's approval. This is the current work; all earlier feature-branch/preparation restrictions below describe historical sessions. No commit, push, merge, signing change, device operation or emulator action was performed.
+
+The registry, generic result/presentation/feedback contract and ViewModel/routing now support future independent rep/set analyzers. Only Bodyweight Squat is registered. Reviewed the worker ordering and immediate epoch gates: strategy replacement is serialized, old session results cannot commit, and reset/discard clear displayed feedback. Camera pipeline files, squat counting algorithm/configuration, pure session controller, history schema/saver and Profile rendering have no changes. UI uses compact stats, accessible 48dp icon controls and wrapping controls for constrained widths; Reset still confirms and Next Set/Finish remain labeled.
+
+Baseline command executed 40 JVM tests successfully (53s; 5 tasks executed, 19 up-to-date). The first full refactor run executed 43 JVM tests successfully and assembled app/test APKs; lint reported 0 errors/32 warnings. Build successful in 4m11s, 21 tasks executed/60 up-to-date. After review, added wrapping controls and a regression for equivalent feedback objects not restarting the display hold. The subsequent run reached 44 passing JVM tests but its overall completion was unavailable after the user's power interruption; it is not counted as a completed verification run.
+
+The resumed final run completed on 2026-11-01 at approximately 07:58 Asia/Dhaka: **BUILD SUCCESSFUL in 2m37s**, 81 actionable tasks (6 executed, 75 up-to-date). **44 JVM tests freshly executed; 0 failures, errors or skips.** Lint analysis/report executed afresh: **0 errors, 32 warnings** (RedundantLabel 1, GradleDependency 3, UnusedResources 22, UseKtx 1, UseTomlInstead 5). Debug and Android-test APK assembly were up-to-date and successful; no connected tests were run. Final diff/content/fence review passed; Git emits only expected LF-to-CRLF normalization warnings. All changes remain uncommitted, and main remains at `1718a44`.
+
+Full verification command:
+
+```powershell
+.\gradlew.bat --offline :app:assembleDebug :app:testDebugUnitTest --rerun :app:lintDebug :app:assembleDebugAndroidTest --no-configuration-cache --max-workers=1 '-Pkotlin.compiler.execution.strategy=in-process' --console=plain
+```
+
+Artifacts: `app/build/outputs/apk/debug/app-debug.apk`, `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`; JVM HTML/XML under `app/build/reports/tests/testDebugUnitTest` and `app/build/test-results/testDebugUnitTest`; lint HTML/TXT/XML/SARIF under `app/build/reports/lint-results-debug.*`. These are ignored generated outputs, not source changes.
+
+Android worker integration tests are compiled, not executed. Existing CI instrumentation is disabled in the baseline workflow and was not changed. User reports successful real squat counting on their phone with the previous implementation; no quantitative or exhaustive accuracy claim is made. New UI visual/accessibility checks and full physical regressions remain pending; use [extension/UI checklist](adding-exercise-analyzers.md) and [Samsung guide](samsung-device-testing.md) after deployment approval.
+
+New files: `analysis/ExerciseMonitorRegistry.kt`, JVM `ExerciseExtensionTest.kt`, `docs/adding-exercise-analyzers.md`. Modified production files: `PoseFrame.kt`, `SquatAnalyzer.kt` (presentation/messages only), `FeedbackPresenter.kt`, `WorkoutSessionViewModel.kt`, `WorkoutSessionScreen.kt`, `MeasuredWorkoutScreen.kt`, `MainActivity.kt`, `ui/components/CameraComponents.kt`. Modified test: Android `WorkoutSessionViewModelTest.kt`. Updated the six root context documents and this report. No dependencies, manifests, signing or unrelated screens changed.
+
+## Historical Checkpoint D report
+
 Date: 2026-10-26, Asia/Dhaka. Branch: `feat/squat-monitoring`, based on main at `e891615`. Checkpoint D authorizes one local commit, `feat: implement bodyweight squat monitoring`, containing this report. Resolve its hash from Git history/the final handoff. No push, merge, rebase, reset or clean is authorized or performed. Device deployment awaits explicit approval; no emulator may be installed, configured or launched.
 
 ## Checkpoint D: final review and preparation

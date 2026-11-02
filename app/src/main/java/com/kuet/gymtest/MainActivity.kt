@@ -82,7 +82,7 @@ fun AppNavigation(workoutSession: WorkoutSessionViewModel) {
                     onBack = { workoutSession.discard(); activeExerciseName = null },
                     onFinish = { summary ->
                         if (activeExerciseName != null) {
-                            val record = if (exercise.name == "Bodyweight Squat") summary?.let(WorkoutRecord::measured)
+                            val record = if (com.kuet.gymtest.analysis.ExerciseMonitorRegistry.find(exercise.name) != null) summary?.let(WorkoutRecord::measured)
                                 else WorkoutRecord(System.currentTimeMillis(), exercise.name,
                                     java.util.UUID.randomUUID().toString(), WorkoutRecordKind.DEMO)
                             if (record != null) history = WorkoutHistoryCodec.appendOnce(history, record)

@@ -19,6 +19,72 @@ import kotlin.math.sin
 
 @RunWith(AndroidJUnit4::class)
 class WorkoutSessionViewModelTest {
+    private data class TestFeedback(override val text: String) : AnalysisFeedback {
+        override val key = "test.guidance"
+        override val priority = 4
+    }
+
+    private class TestAnalyzer(private val label: String) : ExerciseAnalyzer {
+        private var ordinal = 0
+        override fun reset() { ordinal = 0 }
+        override fun invalidateTracking(reason: DiscontinuityReason) = Unit
+        override fun processFrame(pose: PoseFrame): ExerciseAnalysisResult {
+            val count = ++ordinal
+            return object : ExerciseAnalysisResult {
+                override val key = pose.key
+                override val timestampMs = pose.timestampMs
+                override val repetitions = count
+                override val repetition = RepetitionCompleted(count, timestampMs)
+                override val feedback = TestFeedback(label)
+                override val trackingValid = true
+                override val presentation = AnalysisPresentation("test-phase", label, true)
+            }
+        }
+    }
+
+    @Test fun exerciseSwitchRejectsQueuedFramesAndCreatesIndependentStrategy() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val worker = Executors.newSingleThreadExecutor()
+        val vm = WorkoutSessionViewModel(SavedStateHandle(), worker, Handler(Looper.getMainLooper())) { name ->
+            ExerciseMonitorDefinition(name, "Test", "Test setup") { TestAnalyzer(name) }
+        }
+        val store = ViewModelStore().apply { put("switch", vm) }
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        fun flush() { worker.submit { }.get(3, TimeUnit.SECONDS) }
+        try {
+            instrumentation.runOnMainSync { vm.open("First", 2, 2); vm.bindCamera(1); vm.start() }
+            flush()
+            vm.pose(PoseFrame(vm.key(1, 1), 100, 100, 100, emptyList())); flush()
+            assertEquals(1, vm.state.value.progress!!.totalReps)
+            worker.execute { entered.countDown(); release.await(3, TimeUnit.SECONDS) }
+            assertTrue(entered.await(3, TimeUnit.SECONDS))
+            val old = PoseFrame(vm.key(1, 2), 200, 100, 100, emptyList())
+            vm.pose(old)
+            instrumentation.runOnMainSync { vm.open("Second", 2, 2); vm.bindCamera(2); vm.start() }
+            release.countDown(); flush()
+            assertEquals(0, vm.state.value.progress!!.totalReps)
+            assertNull(vm.state.value.analysis)
+            vm.pose(old); flush()
+            assertEquals(0, vm.state.value.progress!!.totalReps)
+            vm.pose(PoseFrame(vm.key(2, 1), 300, 100, 100, emptyList())); flush()
+            assertEquals(1, vm.state.value.progress!!.totalReps)
+            assertEquals("Second", vm.state.value.displayedFeedback!!.text)
+            assertEquals("test-phase", vm.state.value.analysis!!.presentation.phaseKey)
+            instrumentation.runOnMainSync { vm.pause(); vm.resume() }
+            flush()
+            vm.pose(PoseFrame(vm.key(2, 2), 400, 100, 100, emptyList())); flush()
+            assertEquals(SessionStatus.BETWEEN_SETS, vm.state.value.progress!!.status)
+            instrumentation.runOnMainSync { vm.nextSet() }; flush()
+            vm.pose(PoseFrame(vm.key(2, 3), 500, 100, 100, emptyList())); flush()
+            assertEquals(listOf(2, 1), vm.state.value.progress!!.perSet)
+            instrumentation.runOnMainSync { vm.reset() }; flush()
+            assertEquals(SessionStatus.SETUP, vm.state.value.progress!!.status)
+            assertEquals(0, vm.state.value.progress!!.totalReps)
+            assertNull(vm.state.value.displayedFeedback)
+        } finally { release.countDown(); instrumentation.runOnMainSync { store.clear() } }
+    }
+
     @Test fun realWorkerCountsOnlyAfterStartAndRestoresPausedLedger() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val saved = SavedStateHandle()

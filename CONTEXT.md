@@ -1,5 +1,23 @@
 # Session handoff
 
+CI preference update (2026-11-02): user no longer wants automatic CI. Removed push/pull_request triggers from `.github/workflows/android-ci.yml`; kept optional manual `workflow_dispatch`. Instrumented job remains disabled. This is a local uncommitted change on `refactor/exercise-monitoring`; remote behavior changes only after publication. No workflow was run, and no GitHub settings were changed. Local verification requirements remain applicable.
+
+## Current work — 2026-11-01
+
+Active branch: `refactor/exercise-monitoring`, created with user approval from clean local main `1718a44`. Prior squat implementation and workflow are already merged into this baseline; the old CI handoff below is historical. No commit/push/merge is authorized for this refactor.
+
+The user approved the OCP integration plan and camera screen cleanup. Implemented: exact-name `ExerciseMonitorRegistry` with fresh analyzer factories; extendible result/feedback contracts and common presentation; generic ViewModel/feedback/UI/history routing. Only Bodyweight Squat is registered. Squat motion rules, camera files, controller, history schema/saver and Profile rendering are unchanged. Compact stats and one control row replace the larger measured controls; Start/Pause/Resume, Reset and camera switch use accessible icons. Next Set and Finish retain labels. The visible 2D-estimate paragraph is removed; limitations remain documented.
+
+New extension guide: [docs/adding-exercise-analyzers.md](docs/adding-exercise-analyzers.md). Test-only alternate strategy checks factory isolation, custom messages/phases, stable message holds and generic partial history. Android worker test covers switching strategies and rejecting queued old frames.
+
+Final verification after the power interruption: BUILD SUCCESSFUL in 2m37s, 6 tasks executed/75 up-to-date. All 44 JVM tests freshly executed, 0 failures/errors/skips. Lint freshly executed: 0 errors/32 warnings. Debug and Android-test APK assembly succeeded incrementally (up-to-date); Android tests were not executed. Reports verified at 07:58 local on 2026-11-01. `git diff --check` passed. Full command/inventory: [verification report](docs/squat-monitoring-verification.md).
+
+User reports that squat counting worked on their own phone with the prior implementation. This is user-reported movement validation, not an exhaustive edge-case/accuracy evaluation or validation of this UI refactor. No phone deployment or local emulator is authorized. Current workflow's instrumented job is disabled; do not describe it as executed.
+
+Next: review the completed uncommitted changes and, after deployment approval, check the compact UI on a phone (including large fonts), session actions and both cameras. Controls wrap when space is limited. Commit/push/merge are not authorized. No new critical defect was found in the scoped source review; Android worker execution and device layout remain unverified.
+
+## Historical handoff — superseded branch/task status
+
 Updated: 2026-10-28 (Asia/Dhaka). Active branch: `feat/squat-monitoring`; checkpoint `7acf936` (`feat: implement bodyweight squat monitoring`), based on main at `e891615`. The checkpoint already exists; do not reuse the earlier one-commit authorization.
 
 ## Current task and authorization

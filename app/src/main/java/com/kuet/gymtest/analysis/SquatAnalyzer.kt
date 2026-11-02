@@ -4,6 +4,22 @@ import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.min
 
+/** Squat-owned messages; other analyzers provide their own AnalysisFeedback values. */
+enum class Feedback(override val text: String, override val priority: Int) : AnalysisFeedback {
+    NO_POSE("Pose unclear — adjust the camera or lighting", 1),
+    FRAMING("Keep your head and feet visible", 2),
+    MOVE_BACK("Move farther back", 2),
+    SIDEWAYS("Stand sideways", 2),
+    UNCERTAIN("Pose unclear — adjust the camera or lighting", 3),
+    STAND("Stand tall to begin", 4),
+    LOWER("Lower into the squat", 4),
+    RETURN("Return to standing", 4),
+    SHALLOW("Try lowering farther on the next repetition", 4),
+    COUNTED("Repetition counted", 5);
+
+    override val key get() = "squat.$name"
+}
+
 enum class SquatPhase { NOT_READY, STANDING, DESCENDING, BOTTOM, ASCENDING }
 enum class DepthStatus { UNKNOWN, ABOVE_TARGET, TARGET_REACHED }
 data class SquatMetrics(val knee: Double, val hip: Double)
@@ -12,7 +28,18 @@ data class SquatAnalysisResult(
     override val repetitions: Int, override val repetition: RepetitionCompleted?,
     override val feedback: Feedback, override val trackingValid: Boolean,
     val phase: SquatPhase, val depth: DepthStatus, val side: BodySide?, val metrics: SquatMetrics?
-) : ExerciseAnalysisResult
+) : ExerciseAnalysisResult {
+    override val presentation get() = AnalysisPresentation(
+        phaseKey = phase.name,
+        phaseLabel = phase.name.lowercase().replace('_', ' '),
+        ready = phase != SquatPhase.NOT_READY,
+        detail = when (depth) {
+            DepthStatus.UNKNOWN -> null
+            DepthStatus.ABOVE_TARGET -> "Bend: above target"
+            DepthStatus.TARGET_REACHED -> "Target bend reached"
+        }
+    )
+}
 
 /** Engineering defaults, not calibrated biomechanical or medical limits. */
 data class SquatConfig(

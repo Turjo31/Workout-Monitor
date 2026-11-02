@@ -30,8 +30,9 @@ import com.kuet.gymtest.session.WorkoutSummary
 @Composable
 fun WorkoutSessionScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel,
     onBack: () -> Unit, onFinish: (WorkoutSummary?) -> Unit) {
-    if (exercise.name == "Bodyweight Squat") {
-        MeasuredWorkoutScreen(exercise, viewModel, onBack, onFinish)
+    val monitor = com.kuet.gymtest.analysis.ExerciseMonitorRegistry.find(exercise.name)
+    if (monitor != null) {
+        MeasuredWorkoutScreen(exercise, viewModel, onBack, onFinish, monitor)
         return
     }
     CameraSystemBars()

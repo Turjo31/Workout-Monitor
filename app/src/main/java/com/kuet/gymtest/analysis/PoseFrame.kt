@@ -17,29 +17,34 @@ enum class BodySide(val shoulder: Int, val hip: Int, val knee: Int, val ankle: I
     LEFT(11, 23, 25, 27, 29, 31), RIGHT(12, 24, 26, 28, 30, 32)
 }
 
-enum class Feedback(val text: String, val priority: Int) {
-    NO_POSE("Pose unclear — adjust the camera or lighting", 1),
-    FRAMING("Keep your head and feet visible", 2),
-    MOVE_BACK("Move farther back", 2),
-    SIDEWAYS("Stand sideways", 2),
-    UNCERTAIN("Pose unclear — adjust the camera or lighting", 3),
-    STAND("Stand tall to begin", 4),
-    LOWER("Lower into the squat", 4),
-    RETURN("Return to standing", 4),
-    SHALLOW("Try lowering farther on the next repetition", 4),
-    COUNTED("Repetition counted", 5)
+/** Stable exercise-owned key; lower priority numbers preempt higher ones.
+ * 1 tracking, 2 positioning, 3 uncertainty, 4 guidance, 5 completion, 6 encouragement.
+ */
+interface AnalysisFeedback {
+    val key: String
+    val text: String
+    val priority: Int
 }
+
+/** Presentation only. Typed movement states and metrics remain inside each analyzer. */
+data class AnalysisPresentation(
+    val phaseKey: String,
+    val phaseLabel: String,
+    val ready: Boolean,
+    val detail: String? = null
+)
 
 enum class DiscontinuityReason { TRACKING, GAP, EPOCH, PAUSE, CAMERA, OVERFLOW }
 data class RepetitionCompleted(val ordinal: Int, val timestampMs: Long)
 
-sealed interface ExerciseAnalysisResult {
+interface ExerciseAnalysisResult {
     val key: FrameKey
     val timestampMs: Long
     val repetitions: Int
     val repetition: RepetitionCompleted?
-    val feedback: Feedback
+    val feedback: AnalysisFeedback
     val trackingValid: Boolean
+    val presentation: AnalysisPresentation
 }
 
 interface ExerciseAnalyzer {
