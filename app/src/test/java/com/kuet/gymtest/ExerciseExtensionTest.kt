@@ -29,11 +29,15 @@ class ExerciseExtensionTest {
         override fun invalidateTracking(reason: DiscontinuityReason) = Unit
     }
 
-    @Test fun registryUsesExactNameAndFreshSquatInstances() {
-        val definition = ExerciseMonitorRegistry.find("Bodyweight Squat")!!
-        assertTrue(definition.createAnalyzer() is SquatAnalyzer)
-        assertNotSame(definition.createAnalyzer(), definition.createAnalyzer())
-        listOf("Goblet Squat", "Push-up", "Jumping Jack", "bodyweight squat", "").forEach {
+    @Test fun registryUsesExactNamesAndFreshAnalyzerInstances() {
+        val types = mapOf("Bodyweight Squat" to SquatAnalyzer::class.java,
+            "Push-up" to PushUpAnalyzer::class.java, "Jumping Jacks" to JumpingJackAnalyzer::class.java)
+        types.forEach { (name, type) ->
+            val definition = ExerciseMonitorRegistry.find(name)!!
+            assertEquals(type, definition.createAnalyzer().javaClass)
+            assertNotSame(definition.createAnalyzer(), definition.createAnalyzer())
+        }
+        listOf("Goblet Squat", "Wall Push-up", "Diamond Push-up", "Jumping Jack", "jumping jacks", "High Knees", "bodyweight squat", "").forEach {
             assertNull(ExerciseMonitorRegistry.find(it))
         }
     }

@@ -42,10 +42,11 @@ data class PushUpAnalysisResult(
 /** Engineering defaults, not calibrated biomechanical or medical limits. Elbow angle is 2D side-view. */
 data class PushUpConfig(
     val topEntry: Double = 160.0, val topExit: Double = 150.0,
+    val finalTopEntry: Double = 155.0,
     val descent: Double = 140.0,
     val bottomEntry: Double = 90.0, val bottomExit: Double = 105.0,
     val minimumBodyLine: Double = 150.0, val horizontalRatio: Double = .6,
-    val readinessMs: Long = 300, val phaseMs: Long = 80, val finalTopMs: Long = 200,
+    val readinessMs: Long = 150, val phaseMs: Long = 80, val finalTopMs: Long = 200,
     val minimumCycleMs: Long = 500, val maximumGapMs: Long = 300,
     val filterMs: Double = 80.0, val maximumSpeed: Double = 900.0,
     val maximumSegmentChange: Double = .35, val chainVisibility: Float = .65f,
@@ -57,6 +58,7 @@ data class PushUpConfig(
     init {
         require(bottomEntry > 0 && bottomEntry < bottomExit && bottomExit < descent &&
                 descent <= topExit && topExit < topEntry && topEntry <= 180)
+        require(finalTopEntry.isFinite() && finalTopEntry > topExit && finalTopEntry <= topEntry)
         require(minimumBodyLine in 0.0..180.0)
         require(listOf(filterMs, maximumSpeed, minimumSegment, shoulderRatio, hipRatio, horizontalRatio,
             minimumShoulderTravel, maximumWristTravelRatio).all { it.isFinite() && it > 0 })
@@ -67,7 +69,10 @@ data class PushUpConfig(
 }
 
 /** Single-owner pure state machine. Invalid observations cancel motion, never accepted reps. */
-class PushUpAnalyzer(private val config: PushUpConfig = PushUpConfig()) : ExerciseAnalyzer {
+class PushUpAnalyzer(
+    private val config: PushUpConfig = PushUpConfig(),
+    private val diagnostic: ((String) -> Unit)? = null
+) : ExerciseAnalyzer {
     private var phase = PushUpPhase.NOT_READY
     private var repetitions = 0
     private var side: BodySide? = null
@@ -96,6 +101,7 @@ class PushUpAnalyzer(private val config: PushUpConfig = PushUpConfig()) : Exerci
     }
 
     override fun invalidateTracking(reason: DiscontinuityReason) {
+        diagnostic?.invoke("invalidate reason=$reason phase=$phase previous=${previous?.timestampMs}")
         phase = PushUpPhase.NOT_READY
         side = null
         rawElbow = null
@@ -125,44 +131,81 @@ class PushUpAnalyzer(private val config: PushUpConfig = PushUpConfig()) : Exerci
     private fun transition(next: PushUpPhase) { phase = next; candidate = null; candidateSamples = 0 }
 
     override fun processFrame(pose: PoseFrame): PushUpAnalysisResult {
+        val phaseBefore = phase
+        var failure: String? = null
+        var rawTrace: Double? = null
+        var filteredTrace: Double? = null
+        var bodyLineTrace: Double? = null
+        var bodyLineOkTrace: Boolean? = null
+        var horizontalOkTrace: Boolean? = null
+        var plankTrace: Boolean? = null
+        var topTrace: Boolean? = null
+        var bottomTrace: Boolean? = null
+        var topBlockers = "unmeasured"
+        var bottomBlockers = "unmeasured"
+        var shoulderTravelTrace: Double? = null
+        var wristTravelTrace: Double? = null
+        var bodyMovedTrace: Boolean? = null
+        var dtTrace: Long? = null
         val old = previous
         fun result(feedback: PushUpFeedback, valid: Boolean = false, metrics: PushUpMetrics? = null,
-                   event: RepetitionCompleted? = null) = PushUpAnalysisResult(
-            pose.key, pose.timestampMs, repetitions, event, feedback, valid, phase, side, metrics
-        )
-        fun invalid(feedback: PushUpFeedback): PushUpAnalysisResult {
+                   event: RepetitionCompleted? = null): PushUpAnalysisResult {
+            diagnostic?.invoke("frame time=${pose.timestampMs} seq=${pose.key.sequence} from=$phaseBefore to=$phase " +
+                "valid=$valid failure=${failure ?: "none"} side=$side rawElbow=$rawTrace " +
+                "smoothElbow=$filteredTrace bodyLine=$bodyLineTrace bodyLineOk=$bodyLineOkTrace " +
+                "horizontalOk=$horizontalOkTrace plank=$plankTrace top=$topTrace bottom=$bottomTrace " +
+                "topBlockers=$topBlockers bottomBlockers=$bottomBlockers shoulderTravel=$shoulderTravelTrace " +
+                "wristTravel=$wristTravelTrace bodyMoved=$bodyMovedTrace " +
+                "candidate=${candidate ?: "none"} samples=$candidateSamples " +
+                "candidateMs=${if (candidate == null) 0 else pose.timestampMs - candidateAt} " +
+                "dt=$dtTrace feedback=$feedback event=${event?.ordinal}")
+            return PushUpAnalysisResult(pose.key, pose.timestampMs, repetitions, event,
+                feedback, valid, phase, side, metrics)
+        }
+        fun invalid(feedback: PushUpFeedback, reason: String): PushUpAnalysisResult {
+            failure = reason
             invalidateTracking(DiscontinuityReason.TRACKING)
             return result(feedback)
         }
         val sameEpoch = old == null || old.key.let {
             it.sessionId == pose.key.sessionId && it.cameraEpoch == pose.key.cameraEpoch && it.analysisEpoch == pose.key.analysisEpoch
         }
-        if (!sameEpoch) return invalid(PushUpFeedback.UNCERTAIN)
+        if (!sameEpoch) return invalid(PushUpFeedback.UNCERTAIN, "epoch changed")
         if (old != null && (pose.timestampMs <= old.timestampMs || pose.key.sequence <= old.key.sequence)) {
-            return invalid(PushUpFeedback.UNCERTAIN)
+            return invalid(PushUpFeedback.UNCERTAIN, "timestamp or sequence nonmonotonic")
         }
         previous = pose
         val dt = old?.let { pose.timestampMs - it.timestampMs }
+        dtTrace = dt
         if (dt != null && dt > config.maximumGapMs) invalidateTracking(DiscontinuityReason.GAP)
-        if (pose.timestampMs < 0 || pose.imageWidth <= 0 || pose.imageHeight <= 0) return invalid(PushUpFeedback.UNCERTAIN)
-        if (pose.landmarks.isEmpty()) return invalid(PushUpFeedback.NO_POSE)
+        if (pose.timestampMs < 0 || pose.imageWidth <= 0 || pose.imageHeight <= 0)
+            return invalid(PushUpFeedback.UNCERTAIN, "invalid timestamp or image size")
+        if (pose.landmarks.isEmpty()) return invalid(PushUpFeedback.NO_POSE, "no pose landmarks")
         fun landmark(i: Int) = pose.landmarks.getOrNull(i)
         fun confident(i: Int) = PoseGeometry.confident(landmark(i), config.chainVisibility, config.presence)
         fun chain(s: BodySide) = listOf(s.shoulder, elbowOf(s), wristOf(s), s.hip, s.ankle)
         fun point(i: Int) = PoseGeometry.point(pose.landmarks[i], pose.imageWidth, pose.imageHeight)!!
         val chosen = side ?: BodySide.entries.filter { s -> chain(s).all { confident(it) } }
             .maxByOrNull { s -> chain(s).minOf { landmark(it)!!.visibility!! } }
-        ?: return invalid(PushUpFeedback.UNCERTAIN)
-        if (!chain(chosen).all { confident(it) }) return invalid(PushUpFeedback.UNCERTAIN)
-        if (!chain(chosen).all { PoseGeometry.inside(landmark(it)!!, config.edgeMargin) }) return invalid(PushUpFeedback.MOVE_BACK)
+        ?: return invalid(PushUpFeedback.UNCERTAIN, "no confident side chain")
+        chain(chosen).firstOrNull { !confident(it) }?.let {
+            return invalid(PushUpFeedback.UNCERTAIN, "landmark $it low confidence")
+        }
+        chain(chosen).firstOrNull { !PoseGeometry.inside(landmark(it)!!, config.edgeMargin) }?.let {
+            return invalid(PushUpFeedback.MOVE_BACK, "landmark $it outside frame")
+        }
         val shoulder = point(chosen.shoulder)
         val elbow = point(elbowOf(chosen))
         val wrist = point(wristOf(chosen))
         val hip = point(chosen.hip)
         val ankle = point(chosen.ankle)
         val minLength = config.minimumSegment * min(pose.imageWidth, pose.imageHeight)
-        val raw = PoseGeometry.angle(shoulder, elbow, wrist, minLength) ?: return invalid(PushUpFeedback.UNCERTAIN)
-        val bodyLine = PoseGeometry.angle(shoulder, hip, ankle, minLength) ?: return invalid(PushUpFeedback.UNCERTAIN)
+        val raw = PoseGeometry.angle(shoulder, elbow, wrist, minLength)
+            ?: return invalid(PushUpFeedback.UNCERTAIN, "elbow geometry invalid")
+        rawTrace = raw
+        val bodyLine = PoseGeometry.angle(shoulder, hip, ankle, minLength)
+            ?: return invalid(PushUpFeedback.UNCERTAIN, "body-line geometry invalid")
+        bodyLineTrace = bodyLine
         val currentLengths = listOf(PoseGeometry.distance(shoulder, elbow), PoseGeometry.distance(elbow, wrist),
             PoseGeometry.distance(shoulder, hip), PoseGeometry.distance(hip, ankle))
         if (listOf(11, 12, 23, 24).all { confident(it) }) {
@@ -170,6 +213,7 @@ class PushUpAnalyzer(private val config: PushUpConfig = PushUpConfig()) : Exerci
             val broad = torso > minLength && PoseGeometry.distance(point(11), point(12)) / torso > config.shoulderRatio &&
                     PoseGeometry.distance(point(23), point(24)) / torso > config.hipRatio
             if (broad) {
+                failure = "front-view width ratio"
                 val since = broadAt ?: pose.timestampMs
                 invalidateTracking(DiscontinuityReason.TRACKING)
                 broadAt = since
@@ -178,19 +222,34 @@ class PushUpAnalyzer(private val config: PushUpConfig = PushUpConfig()) : Exerci
         }
         broadAt = null
         if (dt != null && dt in 1..config.maximumGapMs &&
-            (rawElbow?.let { abs(raw - it) * 1000 / dt > config.maximumSpeed } == true ||
-                    lengths?.zip(currentLengths)?.any { (a, b) -> abs(b - a) / a > config.maximumSegmentChange } == true)
-        ) return invalid(PushUpFeedback.UNCERTAIN)
+            rawElbow?.let { abs(raw - it) * 1000 / dt > config.maximumSpeed } == true)
+            return invalid(PushUpFeedback.UNCERTAIN, "elbow speed above limit")
+        if (dt != null && dt in 1..config.maximumGapMs &&
+            lengths?.zip(currentLengths)?.any { (a, b) -> abs(b - a) / a > config.maximumSegmentChange } == true)
+            return invalid(PushUpFeedback.UNCERTAIN, "segment length changed above limit")
         side = chosen
         val last = filtered
         val angle = if (last != null && dt != null) last + (1 - exp(-dt.toDouble() / config.filterMs)) * (raw - last) else raw
         filtered = angle
+        filteredTrace = angle
         rawElbow = raw
         lengths = currentLengths
         val now = pose.timestampMs
-        val plank = bodyLine >= config.minimumBodyLine &&
-                abs(ankle.y - shoulder.y) <= config.horizontalRatio * abs(ankle.x - shoulder.x)
+        val bodyLineOk = bodyLine >= config.minimumBodyLine
+        val horizontalOk = abs(ankle.y - shoulder.y) <= config.horizontalRatio * abs(ankle.x - shoulder.x)
+        val plank = bodyLineOk && horizontalOk
         val top = raw >= config.topEntry && angle >= config.topEntry && plank
+        val finalTop = raw >= config.finalTopEntry && angle >= config.finalTopEntry && plank
+        bodyLineOkTrace = bodyLineOk
+        horizontalOkTrace = horizontalOk
+        plankTrace = plank
+        topTrace = top
+        topBlockers = listOfNotNull(
+            "rawElbow".takeIf { raw < config.topEntry },
+            "smoothElbow".takeIf { angle < config.topEntry },
+            "bodyLine".takeIf { !bodyLineOk },
+            "horizontal".takeIf { !horizontalOk }
+        ).joinToString(",").ifEmpty { "none" }
         // A real push-up moves the shoulder while the hand stays planted; elbow-only motion does the opposite.
         if (top) { refShoulder = shoulder; refWrist = wrist }
         val armLength = currentLengths[0] + currentLengths[1]
@@ -199,6 +258,16 @@ class PushUpAnalyzer(private val config: PushUpConfig = PushUpConfig()) : Exerci
         val bodyMoved = shoulderTravel >= config.minimumShoulderTravel * armLength &&
                 wristTravel <= config.maximumWristTravelRatio * shoulderTravel
         val bottom = raw <= config.bottomEntry && angle <= config.bottomEntry && bodyMoved
+        shoulderTravelTrace = shoulderTravel
+        wristTravelTrace = wristTravel
+        bodyMovedTrace = bodyMoved
+        bottomTrace = bottom
+        bottomBlockers = listOfNotNull(
+            "rawElbow".takeIf { raw > config.bottomEntry },
+            "smoothElbow".takeIf { angle > config.bottomEntry },
+            "shoulderTravel".takeIf { shoulderTravel < config.minimumShoulderTravel * armLength },
+            "wristTravel".takeIf { wristTravel > config.maximumWristTravelRatio * shoulderTravel }
+        ).joinToString(",").ifEmpty { "none" }
         var event: RepetitionCompleted? = null
         if (phase in listOf(PushUpPhase.DESCENDING, PushUpPhase.BOTTOM, PushUpPhase.ASCENDING)) minimum = min(minimum, angle)
         when (phase) {
@@ -221,7 +290,7 @@ class PushUpAnalyzer(private val config: PushUpConfig = PushUpConfig()) : Exerci
             }
             PushUpPhase.BOTTOM -> if (confirm("up", raw >= config.bottomExit && angle >= config.bottomExit && angle >= minimum + 12, now, config.phaseMs)) transition(PushUpPhase.ASCENDING)
             PushUpPhase.ASCENDING -> {
-                if (confirm("top", top, now, config.finalTopMs)) {
+                if (confirm("top", finalTop, now, config.finalTopMs)) {
                     if (now - attemptAt >= config.minimumCycleMs) {
                         repetitions++
                         event = RepetitionCompleted(repetitions, now)

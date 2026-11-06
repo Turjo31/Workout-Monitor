@@ -1,6 +1,6 @@
 # Adding a repetition-based exercise analyzer
 
-The app uses Strategy (`ExerciseAnalyzer`) and a registry-backed Simple Factory (`ExerciseMonitorRegistry`). Only Bodyweight Squat is currently registered. Push-up and Jumping Jack are future implementations, not existing capabilities.
+The app uses Strategy (`ExerciseAnalyzer`) and a registry-backed Simple Factory (`ExerciseMonitorRegistry`). Exact catalog names `Bodyweight Squat`, `Push-up` and `Jumping Jacks` are registered. Each uses an independently owned analyzer; physical calibration and executed verification limits are recorded in `TASKS.md`.
 
 ## Implementation steps
 
