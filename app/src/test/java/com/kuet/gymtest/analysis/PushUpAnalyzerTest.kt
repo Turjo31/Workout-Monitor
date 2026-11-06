@@ -90,6 +90,24 @@ class PushUpAnalyzerTest {
         assertEquals(0, run(PushUpAnalyzer(), angles).last().repetitions)
     }
 
+    @Test fun returnToNearlyStraightTopCountsAfterFullDescent() {
+        val angles = lead() + ramp(170.0, 80.0) + List(8) { 80.0 } +
+            ramp(80.0, 157.0) + List(12) { 157.0 }
+        val results = run(PushUpAnalyzer(), angles)
+        assertEquals(1, results.last().repetitions)
+        assertEquals(1, results.count { it.repetition != null })
+    }
+
+    @Test fun returnBelowFinalTopThresholdDoesNotCount() {
+        val angles = lead() + ramp(170.0, 80.0) + List(8) { 80.0 } +
+            ramp(80.0, 154.0) + List(10) { 154.0 }
+        assertEquals(0, run(PushUpAnalyzer(), angles).last().repetitions)
+    }
+
+    @Test fun nearStraightTopAloneDoesNotEstablishReadiness() {
+        assertTrue(run(PushUpAnalyzer(), List(12) { 157.0 }).all { it.phase == PushUpPhase.NOT_READY })
+    }
+
     @Test fun elbowOnlyMotionNeverCounts() {
         val a = PushUpAnalyzer()
         val results = (lead() + rep() + rep()).map { a.processFrame(frame(it, elbowOnly = true)) }
@@ -101,6 +119,28 @@ class PushUpAnalyzerTest {
         val results = (1..30).map { a.processFrame(frame(170.0, upright = true)) }
         assertTrue(results.all { it.phase == PushUpPhase.NOT_READY && it.repetitions == 0 })
         assertEquals(PushUpFeedback.READY, results.last().feedback)
+    }
+
+    @Test fun topReadinessNeedsOneHundredFiftyMilliseconds() {
+        val results = run(PushUpAnalyzer(), List(6) { 170.0 })
+        assertTrue(results.take(5).all { it.phase == PushUpPhase.NOT_READY })
+        assertEquals(PushUpPhase.TOP, results.last().phase)
+        assertEquals(0, results.last().repetitions)
+    }
+
+    @Test fun traceNamesReadinessEvidenceAndTrackingFailureWithoutChangingCount() {
+        val lines = mutableListOf<String>()
+        val analyzer = PushUpAnalyzer(diagnostic = lines::add)
+        val notReady = analyzer.processFrame(frame(170.0, upright = true))
+        assertEquals(PushUpPhase.NOT_READY, notReady.phase)
+        assertTrue(lines.any { it.contains("to=NOT_READY") && it.contains("plank=false") &&
+            it.contains("top=false") && it.contains("topBlockers=") && it.contains("bodyLine=") })
+
+        val lost = analyzer.processFrame(emptyFrame())
+        assertFalse(lost.trackingValid)
+        assertEquals(0, lost.repetitions)
+        assertTrue(lines.any { it.contains("failure=no pose landmarks") })
+        assertTrue(lines.any { it.contains("invalidate reason=TRACKING") })
     }
 
     @Test fun trackingLossKeepsCountAndRequiresReacquire() {
@@ -124,6 +164,11 @@ class PushUpAnalyzerTest {
     @Test fun invalidConfigIsRejected() {
         try {
             PushUpConfig(topEntry = 150.0, topExit = 155.0)
+            fail("Expected IllegalArgumentException")
+        } catch (expected: IllegalArgumentException) {
+        }
+        try {
+            PushUpConfig(finalTopEntry = 150.0)
             fail("Expected IllegalArgumentException")
         } catch (expected: IllegalArgumentException) {
         }
