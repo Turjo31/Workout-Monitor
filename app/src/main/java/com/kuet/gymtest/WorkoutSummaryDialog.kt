@@ -70,8 +70,8 @@ fun WorkoutSummaryDialog(
                     style = MaterialTheme.typography.bodySmall)
                 HorizontalDivider(color = CameraInk.copy(alpha = .3f))
                 Text("Uncounted observed attempts", style = MaterialTheme.typography.titleSmall)
-                Text("Incomplete curl: $incomplete")
-                Text("Tracking interrupted mid-curl: $interrupted")
+                Text("Incomplete attempt: $incomplete")
+                Text("Tracking interrupted mid-attempt: $interrupted")
                 Text("These are observed attempts, not confirmed missed repetitions.",
                     style = MaterialTheme.typography.bodySmall)
             }

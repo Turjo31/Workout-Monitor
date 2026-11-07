@@ -66,4 +66,14 @@ class ExerciseFiltersTest {
         assertNotNull(ExerciseMonitorRegistry.find("Biceps Curl"))
         assertTrue(ExerciseMonitorRegistry.find("Biceps Curl")!!.summariesEnabled)
     }
+
+    @Test
+    fun lateralRaiseAppearsUnderBeginnerDumbbellShouldersWithMeasuredAnalyzer() {
+        val matches = filteredExercises(ExerciseFilters(goal = "Muscle Gain", level = "Beginner",
+            equipment = "Dumbbells", muscle = "Shoulders", category = "Strength"), "Lateral Raise")
+        assertEquals(listOf("Lateral Raise"), matches.map { it.name })
+        assertEquals(3, matches.single().defaultSets)
+        assertEquals(12, matches.single().defaultReps)
+        assertTrue(ExerciseMonitorRegistry.find("Lateral Raise")!!.summariesEnabled)
+    }
 }

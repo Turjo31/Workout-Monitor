@@ -52,6 +52,16 @@ object ExerciseMonitorRegistry {
             createAnalyzer = { BicepsCurlAnalyzer(diagnostic = { line ->
                 runCatching { Log.d("BicepsCurlTrace", line) }
             }) }
+        ),
+        ExerciseMonitorDefinition(
+            exerciseName = "Lateral Raise",
+            monitoringLabel = "Front-view two-arm lateral raise monitoring",
+            setupGuidance = "Face the camera with both shoulders, arms, hands and hips visible; start with your arms at your sides",
+            formIssueLabel = "Arm position needs attention",
+            summariesEnabled = true,
+            createAnalyzer = { LateralRaiseAnalyzer(diagnostic = { line ->
+                runCatching { Log.d("LateralRaiseTrace", line) }
+            }) }
         )
     ).associateBy { it.exerciseName }
 
