@@ -1,5 +1,6 @@
 package com.kuet.gymtest.analysis
 
+import com.kuet.gymtest.session.WorkoutSessionController
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,6 +10,7 @@ import org.junit.Test
 class ObliqueCrunchAnalyzerTest {
     private val stepMs = 33L
     private var seq = 0L
+    private var keyOf: (Long) -> FrameKey = { FrameKey("test", 1, 1, it) }
 
     private fun lm(x: Double, y: Double, visibility: Float = .95f) =
         PoseLandmark(x.toFloat(), y.toFloat(), 0f, visibility, .95f)
@@ -20,22 +22,24 @@ class ObliqueCrunchAnalyzerTest {
      * left-body (landmarks 11/13/23/25) and right-body sides. With [elbowsStayHigh] the knee lifts but the elbow does not.
      */
     private fun frame(a: Double, b: Double = 0.0, elbowsStayHigh: Boolean = false, sideView: Boolean = false,
-                      hidden: Boolean = false): PoseFrame {
+                      hidden: Boolean = false, lean: Boolean = true): PoseFrame {
         seq++
         val blank = PoseLandmark(.5f, .5f, 0f, 0f, 0f)
         val l = MutableList(33) { blank }
-        l[11] = lm(if (sideView) .5 else .40, .30); l[12] = lm(if (sideView) .5 else .60, .30)
+        // The shoulder on the working side drops when the torso bends toward the raised knee.
+        l[11] = lm(if (sideView) .5 else .40, .30 + if (lean) .04 * a else 0.0)
+        l[12] = lm(if (sideView) .5 else .60, .30 + if (lean) .04 * b else 0.0)
         l[23] = lm(.44, .55); l[24] = lm(.56, .55)
         val elbowT = { t: Double -> if (elbowsStayHigh) 0.0 else t }
         l[13] = lm(lerp(.34, .38, elbowT(a)), lerp(.28, .57, elbowT(a)))
         l[14] = lm(lerp(.66, .62, elbowT(b)), lerp(.28, .57, elbowT(b)), if (hidden) .1f else .95f)
         l[25] = lm(lerp(.45, .38, a), lerp(.78, .60, a)); l[26] = lm(lerp(.55, .62, b), lerp(.78, .60, b))
-        return PoseFrame(FrameKey("test", 1, 1, seq), seq * stepMs, 1000, 1000, l)
+        return PoseFrame(keyOf(seq), seq * stepMs, 1000, 1000, l)
     }
 
     private fun emptyFrame(): PoseFrame {
         seq++
-        return PoseFrame(FrameKey("test", 1, 1, seq), seq * stepMs, 1000, 1000, emptyList())
+        return PoseFrame(keyOf(seq), seq * stepMs, 1000, 1000, emptyList())
     }
 
     private fun ramp(from: Double, to: Double, frames: Int = 30) = (1..frames).map { lerp(from, to, it.toDouble() / frames) }
@@ -138,6 +142,54 @@ class ObliqueCrunchAnalyzerTest {
         run(a, lead() + crunch())
         a.reset()
         assertEquals(0, a.processFrame(frame(0.0)).repetitions)
+    }
+
+    @Test fun sideBendMakesTheCountedRepGoodForm() {
+        val results = run(ObliqueCrunchAnalyzer(), lead() + crunch())
+        val event = results.first { it.repetition != null }.repetition!!
+        assertEquals(RepFormQuality.GOOD, event.assessment!!.quality)
+    }
+
+    @Test fun noSideBendStillCountsButNeedsAttention() {
+        val a = ObliqueCrunchAnalyzer()
+        val results = (lead() + crunch()).map { a.processFrame(frame(it, lean = false)) }
+        assertEquals(1, results.last().repetitions)
+        val assessment = results.first { it.repetition != null }.repetition!!.assessment!!
+        assertEquals(RepFormQuality.NEEDS_ATTENTION, assessment.quality)
+        assertEquals("Limited side bend", assessment.note)
+    }
+
+    @Test fun incompleteAttemptIsReportedOnceAndNotCounted() {
+        val results = run(ObliqueCrunchAnalyzer(), lead() + crunch(.6))
+        assertEquals(0, results.last().repetitions)
+        assertEquals(1, results.count { it.uncountedAttempt == UncountedAttempt.INCOMPLETE })
+        assertTrue(results.any { it.attemptInProgress })
+    }
+
+    @Test fun trackingLossMidAttemptIsReportedOnce() {
+        val a = ObliqueCrunchAnalyzer()
+        val path = lead() + crunch()
+        val results = mutableListOf<ObliqueCrunchAnalysisResult>()
+        path.forEachIndexed { i, t ->
+            results += a.processFrame(frame(t))
+            if (i == 12 + 30 + 4) repeat(3) { results += a.processFrame(emptyFrame()) }
+        }
+        assertEquals(1, results.count { it.uncountedAttempt == UncountedAttempt.TRACKING_INTERRUPTED })
+        assertEquals(0, results.count { it.uncountedAttempt == UncountedAttempt.INCOMPLETE })
+    }
+
+    @Test fun sessionSummaryCarriesFormAndAttemptCounts() {
+        val controller = WorkoutSessionController("Standing Oblique Crunch", 1, 3)
+        controller.start()
+        keyOf = { s -> controller.state.let { FrameKey(it.sessionId, it.cameraEpoch, it.analysisEpoch, s) } }
+        val a = ObliqueCrunchAnalyzer()
+        (lead() + crunch() + crunch(.6)).forEach { assertTrue(controller.accept(a.processFrame(frame(it)))) }
+        val summary = controller.finish(1000)!!
+        assertEquals(listOf(1), summary.perSet)
+        assertEquals(1, summary.goodFormReps)
+        assertEquals(0, summary.formIssueReps)
+        assertEquals(1, summary.incompleteAttempts)
+        assertEquals(0, summary.trackingInterruptedAttempts)
     }
 
     @Test fun traceReportsFramesWithoutChangingCount() {

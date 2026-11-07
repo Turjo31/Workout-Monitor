@@ -29,7 +29,8 @@ data class ObliqueCrunchAnalysisResult(
     override val key: FrameKey, override val timestampMs: Long,
     override val repetitions: Int, override val repetition: RepetitionCompleted?,
     override val feedback: ObliqueCrunchFeedback, override val trackingValid: Boolean,
-    val phase: ObliqueCrunchPhase, val metrics: ObliqueCrunchMetrics?
+    val phase: ObliqueCrunchPhase, val metrics: ObliqueCrunchMetrics?,
+    override val uncountedAttempt: UncountedAttempt? = null, override val attemptInProgress: Boolean = false
 ) : ExerciseAnalysisResult {
     override val presentation get() = AnalysisPresentation(
         phaseKey = phase.name,
@@ -47,7 +48,7 @@ data class ObliqueCrunchAnalysisResult(
 data class ObliqueCrunchConfig(
     val standingLift: Double = .70, val standingExit: Double = .60, val raiseLift: Double = .55,
     val peakLift: Double = .40, val peakExitLift: Double = .50, val supportLift: Double = .60,
-    val closeEntry: Double = .60, val frontRatio: Double = .45,
+    val closeEntry: Double = .60, val frontRatio: Double = .45, val sideBendMin: Double = .08,
     val readinessMs: Long = 300, val phaseMs: Long = 80, val finalStandingMs: Long = 150,
     val minimumCycleMs: Long = 500, val maximumGapMs: Long = 300,
     val filterMs: Double = 80.0, val maximumLiftSpeed: Double = 8.0,
@@ -58,7 +59,7 @@ data class ObliqueCrunchConfig(
     init {
         require(peakLift > 0 && peakLift < peakExitLift && peakExitLift < raiseLift && raiseLift < standingExit &&
                 standingExit < standingLift && supportLift in peakExitLift..standingLift)
-        require(listOf(closeEntry, frontRatio, filterMs, maximumLiftSpeed, minimumSegment).all { it.isFinite() && it > 0 })
+        require(listOf(closeEntry, frontRatio, sideBendMin, filterMs, maximumLiftSpeed, minimumSegment).all { it.isFinite() && it > 0 })
         require(listOf(readinessMs, phaseMs, finalStandingMs, minimumCycleMs, maximumGapMs, orientationMs,
             maximumTransientMs).all { it > 0 })
         require(maximumTransientFrames > 0 && maximumSegmentChange in 0.0..1.0 && edgeMargin in 0f..0.25f)
@@ -90,6 +91,9 @@ class ObliqueCrunchAnalyzer(
     private var broadAt: Long? = null
     private var countedAt: Long? = null
     private var shallowAt: Long? = null
+    private var maxTilt = -1.0
+    private var pendingUncounted: UncountedAttempt? = null
+    private val attemptPhases = setOf(ObliqueCrunchPhase.RAISING, ObliqueCrunchPhase.CRUNCH, ObliqueCrunchPhase.LOWERING)
     private var lastValidAt: Long? = null
     private var transientFrames = 0
     private var lastFeedback = ObliqueCrunchFeedback.READY
@@ -102,6 +106,10 @@ class ObliqueCrunchAnalyzer(
 
     override fun invalidateTracking(reason: DiscontinuityReason) {
         diagnostic?.invoke("invalidate reason=$reason phase=$phase previous=${previous?.timestampMs}")
+        // Only internal loss counts as an interrupted attempt; the session owner reports overflow and watchdog loss itself.
+        if ((reason == DiscontinuityReason.TRACKING || reason == DiscontinuityReason.GAP) && phase in attemptPhases)
+            pendingUncounted = UncountedAttempt.TRACKING_INTERRUPTED
+        maxTilt = -1.0
         phase = ObliqueCrunchPhase.NOT_READY
         rawLifts = null
         filtered = null
@@ -136,10 +144,13 @@ class ObliqueCrunchAnalyzer(
         var traceRaw = "unmeasured"
         fun result(feedback: ObliqueCrunchFeedback, valid: Boolean = false, metrics: ObliqueCrunchMetrics? = null,
                    event: RepetitionCompleted? = null): ObliqueCrunchAnalysisResult {
+            val reported = pendingUncounted
+            pendingUncounted = null
             diagnostic?.invoke("frame time=${pose.timestampMs} seq=${pose.key.sequence} from=$phaseBefore to=$phase " +
                     "valid=$valid failure=${failure ?: "none"} raw=$traceRaw working=$working smooth=$metrics " +
-                    "candidate=${candidate ?: "none"} samples=$candidateSamples event=${event?.ordinal}")
-            return ObliqueCrunchAnalysisResult(pose.key, pose.timestampMs, repetitions, event, feedback, valid, phase, metrics)
+                    "candidate=${candidate ?: "none"} samples=$candidateSamples maxTilt=$maxTilt event=${event?.ordinal} uncounted=$reported")
+            return ObliqueCrunchAnalysisResult(pose.key, pose.timestampMs, repetitions, event, feedback, valid, phase, metrics,
+                reported, valid && phase in attemptPhases)
         }
         fun invalid(feedback: ObliqueCrunchFeedback, reason: String): ObliqueCrunchAnalysisResult {
             failure = reason
@@ -196,6 +207,9 @@ class ObliqueCrunchAnalyzer(
         val rawLiftB = (kneeB.y - hipB.y) / torso
         val rawCloseA = PoseGeometry.distance(elbowA, kneeA) / torso
         val rawCloseB = PoseGeometry.distance(elbowB, kneeB) / torso
+        // Positive when the shoulder on that side is lower than the other: lateral flexion toward the raised knee.
+        val tiltA = (shoulderA.y - shoulderB.y) / torso
+        fun tiltOf(side: Int) = if (side == 0) tiltA else -tiltA
         traceRaw = "[liftA=$rawLiftA liftB=$rawLiftB closeA=$rawCloseA closeB=$rawCloseB]"
         if (PoseGeometry.distance(shoulderA, shoulderB) / torso < config.frontRatio) {
             val since = broadAt ?: pose.timestampMs
@@ -237,12 +251,14 @@ class ObliqueCrunchAnalyzer(
             lift(side, s) <= config.peakLift && close(side, s) <= config.closeEntry && lift(1 - side, s) >= config.supportLift
         }
         var event: RepetitionCompleted? = null
+        if (phase in attemptPhases) maxTilt = max(maxTilt, tiltOf(working))
         when (phase) {
             ObliqueCrunchPhase.NOT_READY -> if (confirm("ready", standing, now, config.readinessMs)) transition(ObliqueCrunchPhase.STANDING)
             ObliqueCrunchPhase.STANDING -> {
                 if (min(smooth[0], smooth[1]) < config.standingExit) countedAt = null
                 if (confirm("raise", rising, now, config.phaseMs)) {
                     working = leader
+                    maxTilt = tiltOf(leader)
                     attemptAt = candidateAt
                     shallowAt = null
                     transition(ObliqueCrunchPhase.RAISING)
@@ -252,6 +268,7 @@ class ObliqueCrunchAnalyzer(
                 if (confirm("peak", peak(working), now, config.phaseMs)) transition(ObliqueCrunchPhase.CRUNCH)
                 else if (confirm("partial", standing, now, config.finalStandingMs)) {
                     shallowAt = now
+                    pendingUncounted = UncountedAttempt.INCOMPLETE
                     transition(ObliqueCrunchPhase.STANDING)
                 }
             }
@@ -261,10 +278,16 @@ class ObliqueCrunchAnalyzer(
                 if (confirm("top", standing, now, config.finalStandingMs)) {
                     if (now - attemptAt >= config.minimumCycleMs) {
                         repetitions++
-                        event = RepetitionCompleted(repetitions, now)
+                        val bent = maxTilt >= config.sideBendMin
+                        event = RepetitionCompleted(repetitions, now, RepAssessment(
+                            if (bent) RepFormQuality.GOOD else RepFormQuality.NEEDS_ATTENTION,
+                            if (bent) null else "Limited side bend"))
                         countedAt = now
                         transition(ObliqueCrunchPhase.STANDING)
-                    } else invalidateTracking(DiscontinuityReason.TRACKING)
+                    } else {
+                        invalidateTracking(DiscontinuityReason.TRACKING)
+                        pendingUncounted = UncountedAttempt.INCOMPLETE
+                    }
                 } else if (confirm("peakAgain", peak(working), now, config.phaseMs)) transition(ObliqueCrunchPhase.CRUNCH)
             }
         }
