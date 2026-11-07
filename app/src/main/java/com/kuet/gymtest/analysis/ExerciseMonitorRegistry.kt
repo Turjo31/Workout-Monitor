@@ -7,8 +7,14 @@ data class ExerciseMonitorDefinition(
     val exerciseName: String,
     val monitoringLabel: String,
     val setupGuidance: String,
+    val formIssueLabel: String,
+    val summariesEnabled: Boolean,
     val createAnalyzer: () -> ExerciseAnalyzer
-)
+) {
+    constructor(exerciseName: String, monitoringLabel: String, setupGuidance: String,
+                createAnalyzer: () -> ExerciseAnalyzer) :
+        this(exerciseName, monitoringLabel, setupGuidance, "Form needs attention", false, createAnalyzer)
+}
 
 /** Exact catalog names only; unregistered exercises retain the explicitly labeled demo. */
 object ExerciseMonitorRegistry {
@@ -35,6 +41,16 @@ object ExerciseMonitorRegistry {
             createAnalyzer = { JumpingJackAnalyzer(diagnostic = { line ->
                 // The pure analyzer also runs in local JVM tests, where Android Log is a stub.
                 runCatching { Log.d("JumpingJackTrace", line) }
+            }) }
+        ),
+        ExerciseMonitorDefinition(
+            exerciseName = "Biceps Curl",
+            monitoringLabel = "Side-view single-arm biceps curl monitoring",
+            setupGuidance = "Stand sideways with one working arm, shoulder, elbow and hand visible; start with your arm lowered",
+            formIssueLabel = "Elbow moved",
+            summariesEnabled = true,
+            createAnalyzer = { BicepsCurlAnalyzer(diagnostic = { line ->
+                runCatching { Log.d("BicepsCurlTrace", line) }
             }) }
         )
     ).associateBy { it.exerciseName }

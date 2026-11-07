@@ -31,7 +31,8 @@ class ExerciseExtensionTest {
 
     @Test fun registryUsesExactNamesAndFreshAnalyzerInstances() {
         val types = mapOf("Bodyweight Squat" to SquatAnalyzer::class.java,
-            "Push-up" to PushUpAnalyzer::class.java, "Jumping Jacks" to JumpingJackAnalyzer::class.java)
+            "Push-up" to PushUpAnalyzer::class.java, "Jumping Jacks" to JumpingJackAnalyzer::class.java,
+            "Biceps Curl" to BicepsCurlAnalyzer::class.java)
         types.forEach { (name, type) ->
             val definition = ExerciseMonitorRegistry.find(name)!!
             assertEquals(type, definition.createAnalyzer().javaClass)
@@ -44,6 +45,7 @@ class ExerciseExtensionTest {
 
     @Test fun independentStrategyUsesExistingLedgerAndHistoryWithPartialSets() {
         val definition = ExerciseMonitorDefinition("Test movement", "Test monitoring", "Test setup", ::TestAnalyzer)
+        assertFalse(definition.summariesEnabled)
         val analyzer = definition.createAnalyzer()
         val controller = WorkoutSessionController(definition.exerciseName, 2, 2)
         controller.start()

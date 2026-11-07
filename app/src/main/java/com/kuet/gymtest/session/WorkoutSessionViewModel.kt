@@ -73,8 +73,14 @@ class WorkoutSessionViewModel internal constructor(
             if (!pending.compareAndSet(false, true)) { overflow.set(true); return }
             worker.execute {
                 try {
-                    if (overflow.getAndSet(false)) analyzer?.invalidateTracking(DiscontinuityReason.OVERFLOW)
                     if (!synchronized(lock) { controller?.accepts(frame.key) == true }) return@execute
+                    if (overflow.getAndSet(false)) {
+                        synchronized(lock) {
+                            controller?.recordTrackingInterruption()
+                            publish()
+                        }
+                        analyzer?.invalidateTracking(DiscontinuityReason.OVERFLOW)
+                    }
                     val result = analyzer?.processFrame(frame) ?: return@execute
                     synchronized(lock) {
                         if (controller?.accept(result) == true) publish(result, feedback.present(result))
