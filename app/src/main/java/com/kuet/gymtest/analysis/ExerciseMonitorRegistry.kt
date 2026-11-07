@@ -62,6 +62,16 @@ object ExerciseMonitorRegistry {
             createAnalyzer = { LateralRaiseAnalyzer(diagnostic = { line ->
                 runCatching { Log.d("LateralRaiseTrace", line) }
             }) }
+        ),
+        ExerciseMonitorDefinition(
+            exerciseName = "Dumbbell Shoulder Press",
+            monitoringLabel = "Front-view two-arm shoulder press monitoring",
+            setupGuidance = "Face the camera with both shoulders, hands and hips visible; start with both hands near shoulder height and leave room above your head",
+            formIssueLabel = "Arm position needs attention",
+            summariesEnabled = true,
+            createAnalyzer = { DumbbellShoulderPressAnalyzer(diagnostic = { line ->
+                runCatching { Log.d("ShoulderPressTrace", line) }
+            }) }
         )
     ).associateBy { it.exerciseName }
 

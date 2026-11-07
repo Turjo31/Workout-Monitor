@@ -76,4 +76,14 @@ class ExerciseFiltersTest {
         assertEquals(12, matches.single().defaultReps)
         assertTrue(ExerciseMonitorRegistry.find("Lateral Raise")!!.summariesEnabled)
     }
+
+    @Test
+    fun dumbbellShoulderPressUsesExistingIntermediateLibraryEntryAndMeasuredAnalyzer() {
+        val matches = filteredExercises(ExerciseFilters(goal = "Muscle Gain", level = "Intermediate",
+            equipment = "Dumbbells", muscle = "Shoulders", category = "Strength"), "Dumbbell Shoulder Press")
+        assertEquals(listOf("Dumbbell Shoulder Press"), matches.map { it.name })
+        assertEquals(3, matches.single().defaultSets)
+        assertEquals(10, matches.single().defaultReps)
+        assertTrue(ExerciseMonitorRegistry.find("Dumbbell Shoulder Press")!!.summariesEnabled)
+    }
 }
