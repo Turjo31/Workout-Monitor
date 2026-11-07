@@ -159,7 +159,7 @@ object RecommendationEngine {
             "Stand upright.",
             "Drive one knee toward your chest.",
             "Alternate quickly and stay light on your feet."),
-        ex("Lunges", WL, "Beginner", NONE, "Legs", "Cardio",
+        ex("Forward Lunges", WL, "Beginner", NONE, "Legs", "Cardio",
             "A lower-body movement that challenges balance.", 3, 10, true,
             "Stand with feet together.",
             "Step forward and lower your body.",
