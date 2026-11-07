@@ -55,6 +55,8 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
     var camera by remember { mutableStateOf(PoseCameraStatus()) }
     var confirmReset by rememberSaveable { mutableStateOf(false) }
     var confirmFinish by rememberSaveable { mutableStateOf(false) }
+    var showSetSummary by rememberSaveable { mutableStateOf(false) }
+    var showSessionSummary by rememberSaveable { mutableStateOf(false) }
     var confirmExit by rememberSaveable { mutableStateOf(false) }
     var delivered by remember { mutableStateOf(false) }
     DisposableEffect(lifecycle, viewModel) {
@@ -69,6 +71,11 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
         onDispose { lifecycle.lifecycle.removeObserver(observer); viewModel.pause() }
     }
     val p = ui.progress ?: return
+    LaunchedEffect(p.sessionId, p.currentSet, p.status) {
+        if (monitor.summariesEnabled &&
+            (p.status == SessionStatus.BETWEEN_SETS || p.status == SessionStatus.COMPLETE))
+            showSetSummary = true
+    }
     val leave: () -> Unit = {
         if (p.status == SessionStatus.SETUP) onBack()
         else { viewModel.pause(); confirmExit = true }
@@ -192,12 +199,52 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
     if (confirmFinish) AlertDialog(onDismissRequest = { confirmFinish = false },
         title = { Text("Finish this workout?") }, text = {
             Text(if (p.totalReps == 0) "No valid repetitions completed. No history entry will be saved."
+                else if (monitor.summariesEnabled) "Review your session summary before saving and leaving."
                 else "${p.totalReps} measured reps · ${p.completedSets} fully completed sets.\n" +
-                    "Reps by set: ${p.perSet.joinToString()}.\n" + if (p.fullyCompleted) "All targets reached." else "This workout will be saved as finished early.")
+                    "Reps by set: ${p.perSet.joinToString()}.\n" +
+                    if (p.fullyCompleted) "All targets reached." else "This workout will be saved as finished early.")
         }, confirmButton = { TextButton(onClick = {
-            if (!delivered) { delivered = true; confirmFinish = false; onFinish(viewModel.finish(System.currentTimeMillis())) }
-        }) { Text("Finish workout") } },
+            confirmFinish = false; showSetSummary = false
+            if (monitor.summariesEnabled) showSessionSummary = true
+            else if (!delivered) {
+                delivered = true
+                onFinish(viewModel.finish(System.currentTimeMillis()))
+            }
+        }) { Text(if (monitor.summariesEnabled) "Review summary" else "Finish workout") } },
         dismissButton = { TextButton(onClick = { confirmFinish = false }) { Text("Keep going") } }, containerColor = IvoryLight)
+    if (showSetSummary) WorkoutSummaryDialog(
+        title = "Set ${p.currentSet} complete",
+        exerciseName = p.exerciseName,
+        repsBySet = listOf(p.currentReps),
+        formBySet = listOf(p.formBySet.last()),
+        attemptsBySet = listOf(p.attemptsBySet.last()),
+        targetReps = p.targetReps,
+        formIssueLabel = monitor.formIssueLabel,
+        onDismiss = { showSetSummary = false },
+        actionLabel = if (p.status == SessionStatus.BETWEEN_SETS) "Next set" else "Close",
+        onAction = {
+            showSetSummary = false
+            if (p.status == SessionStatus.BETWEEN_SETS) viewModel.nextSet()
+        }
+    )
+    if (showSessionSummary) WorkoutSummaryDialog(
+        title = "Session summary",
+        exerciseName = p.exerciseName,
+        repsBySet = p.perSet,
+        formBySet = p.formBySet,
+        attemptsBySet = p.attemptsBySet,
+        targetReps = p.targetReps,
+        formIssueLabel = monitor.formIssueLabel,
+        onDismiss = { showSessionSummary = false },
+        actionLabel = "Save and close",
+        onAction = {
+            if (!delivered) {
+                delivered = true
+                showSessionSummary = false
+                onFinish(viewModel.finish(System.currentTimeMillis()))
+            }
+        }
+    )
     if (confirmExit) AlertDialog(onDismissRequest = { confirmExit = false }, title = { Text("Leave this workout?") },
         text = { Text("Discard this workout, or use Finish to save your measured repetitions.") },
         confirmButton = { TextButton(onClick = { confirmExit = false; onBack() }) { Text("Discard") } },

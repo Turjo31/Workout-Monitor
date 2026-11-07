@@ -1,5 +1,6 @@
 package com.kuet.gymtest
 
+import com.kuet.gymtest.analysis.ExerciseMonitorRegistry
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -55,5 +56,14 @@ class ExerciseFiltersTest {
     @Test
     fun unmatchedSearchHasAnEmptyResult() {
         assertTrue(filteredExercises(ExerciseFilters(), "unknown exercise xyz").isEmpty())
+    }
+
+    @Test
+    fun singleArmBicepsCurlAppearsInDumbbellLibraryAndIsMeasured() {
+        val matches = filteredExercises(ExerciseFilters(equipment = "Dumbbells"), "Biceps Curl")
+        assertEquals(listOf("Biceps Curl"), matches.map { it.name })
+        assertEquals("Biceps", matches.single().muscleGroup)
+        assertNotNull(ExerciseMonitorRegistry.find("Biceps Curl"))
+        assertTrue(ExerciseMonitorRegistry.find("Biceps Curl")!!.summariesEnabled)
     }
 }

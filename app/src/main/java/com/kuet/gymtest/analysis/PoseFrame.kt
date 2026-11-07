@@ -35,7 +35,10 @@ data class AnalysisPresentation(
 )
 
 enum class DiscontinuityReason { TRACKING, GAP, EPOCH, PAUSE, CAMERA, OVERFLOW }
-data class RepetitionCompleted(val ordinal: Int, val timestampMs: Long)
+enum class RepFormQuality { GOOD, NEEDS_ATTENTION, NOT_ASSESSED }
+data class RepAssessment(val quality: RepFormQuality, val note: String? = null)
+data class RepetitionCompleted(val ordinal: Int, val timestampMs: Long, val assessment: RepAssessment? = null)
+enum class UncountedAttempt { INCOMPLETE, TRACKING_INTERRUPTED }
 
 interface ExerciseAnalysisResult {
     val key: FrameKey
@@ -45,6 +48,8 @@ interface ExerciseAnalysisResult {
     val feedback: AnalysisFeedback
     val trackingValid: Boolean
     val presentation: AnalysisPresentation
+    val uncountedAttempt: UncountedAttempt? get() = null
+    val attemptInProgress: Boolean get() = false
 }
 
 interface ExerciseAnalyzer {

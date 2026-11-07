@@ -1,5 +1,11 @@
 # Architecture decision log
 
+2026-11-07 - Track observed uncounted curl attempts separately from reps. A visibly started curl that returns to extension without contraction is incomplete; tracking loss during an active curl is tracking-interrupted. Neither is a counted rep or a confirmed missed repetition. Keep per-set counters in saved session progress and show them in the reusable Biceps Curl summary. Avoid fabricating outcomes for motion not confidently observed; other exercise analyzers remain unchanged. Backward decode v1/v2 progress with zero attempt counts.
+
+2026-11-06 — Separate curl rep detection from form assessment. A complete confidently tracked extended → contracted → extended cycle remains a counted rep even when the elbow shifts; shoulder-relative displacement produces an `Elbow moved` form note instead of cancelling the cycle. Missing/invalid tracking, geometry, long gaps and incomplete motion still prevent counting. Store accepted-rep quality totals per set in saved session progress and provide generic set/session summary presentation, initially enabled only for Biceps Curl. Other analyzers report unassessed form internally until they supply assessments and retain their existing UI flow. The threshold and wording are provisional pending phone testing; summary UI is not a clinical or technique score. Existing workout-history records retain only their current measured rep/set fields.
+
+2026-11-06 — Biceps Curl measured integration: use the existing measured screen only with a real analyzer and exact registry entry, rather than routing catalog-only exercises into a UI that would label timed/demo progress as measured. First version observes one visible arm from a side view, locks that side for an attempt and counts only extended → contracted → extended. No automatic arm switching, dumbbell recognition or per-arm target accounting is implied; these need later design and physical validation. Existing `Dumbbell Curl` stays separate. This follows the user's request to show the shared Start/Pause/Reset/Finish UI for Biceps Curl.
+
 ## ADR-008 — Registry-selected strategies and generic measured presentation
 
 - Date: 2026-11-01.
