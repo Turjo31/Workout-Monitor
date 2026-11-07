@@ -72,6 +72,14 @@ object ExerciseMonitorRegistry {
             createAnalyzer = { DumbbellShoulderPressAnalyzer(diagnostic = { line ->
                 runCatching { Log.d("ShoulderPressTrace", line) }
             }) }
+        ),
+        ExerciseMonitorDefinition(
+            exerciseName = "Lunges",
+            monitoringLabel = "Side-view lunge monitoring",
+            setupGuidance = "Stand sideways to the camera, feet together, with your whole body visible and room to step forward",
+            createAnalyzer = { LungeAnalyzer(diagnostic = { line ->
+                runCatching { Log.d("LungeTrace", line) }
+            }) }
         )
     ).associateBy { it.exerciseName }
 
