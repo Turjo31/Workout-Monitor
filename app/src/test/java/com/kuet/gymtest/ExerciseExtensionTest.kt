@@ -34,7 +34,8 @@ class ExerciseExtensionTest {
             "Push-up" to PushUpAnalyzer::class.java, "Jumping Jacks" to JumpingJackAnalyzer::class.java,
             "Biceps Curl" to BicepsCurlAnalyzer::class.java,
             "Lateral Raise" to LateralRaiseAnalyzer::class.java,
-            "Dumbbell Shoulder Press" to DumbbellShoulderPressAnalyzer::class.java)
+            "Dumbbell Shoulder Press" to DumbbellShoulderPressAnalyzer::class.java,
+            "Forward Lunges" to ForwardLungeAnalyzer::class.java)
         types.forEach { (name, type) ->
             val definition = ExerciseMonitorRegistry.find(name)!!
             assertEquals(type, definition.createAnalyzer().javaClass)

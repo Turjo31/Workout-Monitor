@@ -86,4 +86,15 @@ class ExerciseFiltersTest {
         assertEquals(10, matches.single().defaultReps)
         assertTrue(ExerciseMonitorRegistry.find("Dumbbell Shoulder Press")!!.summariesEnabled)
     }
+
+    @Test
+    fun forwardLungesReplacesAmbiguousLibraryLabelAndUsesMeasuredAnalyzer() {
+        val matches = filteredExercises(ExerciseFilters(goal = "Weight Loss", level = "Beginner",
+            equipment = "No Equipment", muscle = "Legs", category = "Cardio"), "Forward Lunges")
+        assertEquals(listOf("Forward Lunges"), matches.map { it.name })
+        assertEquals(3, matches.single().defaultSets)
+        assertEquals(10, matches.single().defaultReps)
+        assertTrue(ExerciseMonitorRegistry.find("Forward Lunges")!!.summariesEnabled)
+        assertNull(ExerciseMonitorRegistry.find("Lunges"))
+    }
 }

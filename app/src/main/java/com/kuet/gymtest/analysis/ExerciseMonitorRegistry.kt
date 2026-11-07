@@ -74,6 +74,16 @@ object ExerciseMonitorRegistry {
             }) }
         ),
         ExerciseMonitorDefinition(
+            exerciseName = "Forward Lunges",
+            monitoringLabel = "Side-view forward lunge monitoring",
+            setupGuidance = "Stand sideways with both legs and your full body visible; step forward, lower, then return to standing",
+            formIssueLabel = "Depth needs attention",
+            summariesEnabled = true,
+            createAnalyzer = { ForwardLungeAnalyzer(diagnostic = { line ->
+                runCatching { Log.d("ForwardLungeTrace", line) }
+            }) }
+        ),
+        ExerciseMonitorDefinition(
             exerciseName = "Standing Oblique Crunch",
             monitoringLabel = "Front-view standing oblique crunch monitoring",
             setupGuidance = "Face the camera with your shoulders, elbows, hips and knees visible; stand tall with your hands behind your head",
