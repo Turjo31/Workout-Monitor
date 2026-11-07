@@ -82,6 +82,16 @@ object ExerciseMonitorRegistry {
             createAnalyzer = { ForwardLungeAnalyzer(diagnostic = { line ->
                 runCatching { Log.d("ForwardLungeTrace", line) }
             }) }
+        ),
+        ExerciseMonitorDefinition(
+            exerciseName = "Standing Oblique Crunch",
+            monitoringLabel = "Front-view standing oblique crunch monitoring",
+            setupGuidance = "Face the camera with your shoulders, elbows, hips and knees visible; stand tall with your hands behind your head",
+            formIssueLabel = "Limited side bend",
+            summariesEnabled = true,
+            createAnalyzer = { ObliqueCrunchAnalyzer(diagnostic = { line ->
+                runCatching { Log.d("ObliqueCrunchTrace", line) }
+            }) }
         )
     ).associateBy { it.exerciseName }
 
