@@ -27,6 +27,11 @@ import com.kuet.gymtest.ui.components.AppBackground
 import com.kuet.gymtest.ui.components.LocalGlassBackdrop
 import com.kuet.gymtest.ui.components.WorkoutBottomNavigation
 import com.kuet.gymtest.ui.theme.GymTestTheme
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.Alignment
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kuet.gymtest.auth.AuthState
+import com.kuet.gymtest.auth.AuthViewModel
 
 enum class Tab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Outlined.Home),
@@ -37,6 +42,7 @@ enum class Tab(val label: String, val icon: ImageVector) {
 
 class MainActivity : ComponentActivity() {
     private val workoutSession by viewModels<WorkoutSessionViewModel>()
+    private val auth by viewModels<AuthViewModel>()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
@@ -44,13 +50,24 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
         )
         setContent {
-            GymTestTheme { AppBackground { AppNavigation(workoutSession) } }
+            GymTestTheme {
+                AppBackground {
+                    val status by auth.state.collectAsStateWithLifecycle()
+                    when (status) {
+                        AuthState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                        AuthState.SignedOut -> AuthScreen(auth)
+                        is AuthState.SignedIn -> AppNavigation(workoutSession, onSignOut = auth::signOut)
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-fun AppNavigation(workoutSession: WorkoutSessionViewModel) {
+fun AppNavigation(workoutSession: WorkoutSessionViewModel, onSignOut: () -> Unit = {}) {
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
     var profile by rememberSaveable(stateSaver = ProfileStateSaver) { mutableStateOf<UserProfile?>(null) }
     var activeExerciseName by rememberSaveable { mutableStateOf<String?>(null) }
@@ -118,11 +135,14 @@ fun AppNavigation(workoutSession: WorkoutSessionViewModel) {
                                 initial = currentProfile, history = history, plan = plan,
                                 onOpenPlan = { tab = Tab.Plan },
                                 onCamera = { showPosePreview = true },
+                                onSignOut = onSignOut,
                                 onSubmit = {
                                     profile = it
                                     val eligible = RecommendationEngine.matchingExercises(it).map(Exercise::name).toSet()
                                     planNames = planNames.filter { name -> name in eligible }
                                 }
+
+
                             )
                         }
                     }

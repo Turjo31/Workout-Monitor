@@ -23,13 +23,14 @@ import com.kuet.gymtest.ui.components.*
 import com.kuet.gymtest.ui.theme.*
 import java.text.DateFormat
 import java.util.Date
-
+import androidx.compose.material.icons.automirrored.filled.Logout
 private const val WEEKLY_WORKOUT_TARGET = 3
 
 @Composable
 fun ProfileScreen(
     initial: UserProfile?, history: List<WorkoutRecord>, plan: List<Exercise>,
-    onSubmit: (UserProfile) -> Unit, onOpenPlan: () -> Unit, onCamera: () -> Unit
+    onSubmit: (UserProfile) -> Unit, onOpenPlan: () -> Unit, onCamera: () -> Unit,
+    onSignOut: () -> Unit = {}
 ) {
     val profile = initial ?: return
     var editing by rememberSaveable { mutableStateOf(false) }
@@ -136,6 +137,7 @@ fun ProfileScreen(
         item { ProfileAction(Icons.Default.FitnessCenter, "Your workout plan", "${plan.size} selected exercises", onOpenPlan) }
         item { ProfileAction(Icons.Default.CameraAlt, "Pose preview", "Open the camera and live pose overlay", onCamera) }
         item { ProfileAction(Icons.Default.Info, "About your data", "How your profile and workouts are kept") { showDataInfo = true } }
+        item { ProfileAction(Icons.AutoMirrored.Filled.Logout, "Log out", "Sign out of this account", onSignOut) }
         item { Text("Workout-Monitor · Move with intention", color = MutedInk,
             style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = Space.Sm)) }
     }
