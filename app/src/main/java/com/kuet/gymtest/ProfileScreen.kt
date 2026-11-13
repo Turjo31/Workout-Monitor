@@ -147,7 +147,7 @@ fun ProfileScreen(
         onDismissRequest = { showDataInfo = false },
         icon = { Icon(Icons.Default.PrivacyTip, null) },
         title = { Text("Your workout data") },
-        text = { Text("Pose detection runs on your device. This app does not upload camera frames. Your profile, plan and workout history are currently held locally in the app session. They can be restored after rotation, but are not stored as a permanent account.") },
+        text = { Text("Pose detection runs on your device. This app does not upload camera frames. Your profile, plan and workout history are saved to your account so they follow you across sessions.") },
         confirmButton = { TextButton(onClick = { showDataInfo = false }) { Text("Got it") } },
         containerColor = IvoryLight
     )

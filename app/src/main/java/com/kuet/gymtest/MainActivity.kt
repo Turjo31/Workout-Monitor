@@ -32,7 +32,9 @@ import androidx.compose.ui.Alignment
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kuet.gymtest.auth.AuthState
 import com.kuet.gymtest.auth.AuthViewModel
-
+import com.kuet.gymtest.data.CloudRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 enum class Tab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Outlined.Home),
     Plan("Plan", Icons.Outlined.FitnessCenter),
@@ -74,6 +76,63 @@ fun AppNavigation(workoutSession: WorkoutSessionViewModel, onSignOut: () -> Unit
     var history by rememberSaveable(stateSaver = HistoryStateSaver) { mutableStateOf(emptyList<WorkoutRecord>()) }
     var planNames by rememberSaveable(stateSaver = PlanNamesStateSaver) { mutableStateOf(emptyList<String>()) }
     var showPosePreview by rememberSaveable { mutableStateOf(false) }
+    var loaded by rememberSaveable { mutableStateOf(false) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var attempt by remember { mutableIntStateOf(0) }
+    var syncedProfile by remember { mutableStateOf<Pair<UserProfile, List<String>>?>(null) }
+    var syncedIds by remember { mutableStateOf(emptySet<String>()) }
+    LaunchedEffect(attempt) {
+        if (loaded) return@LaunchedEffect
+        loadError = null
+        try {
+            val data = CloudRepository.load()
+            val cloudProfile = data.profile
+            if (cloudProfile != null) {
+                profile = cloudProfile
+                planNames = data.planNames
+                history = data.history
+                syncedProfile = cloudProfile to data.planNames
+                syncedIds = data.history.mapNotNull { it.sessionId }.toSet()
+            }
+            loaded = true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            loadError = e.message ?: "Please check your connection and try again."
+        }
+    }
+    // Profile and plan are saved together. A failed save retries every 5 seconds while the app is open.
+    LaunchedEffect(profile, planNames, loaded) {
+        val p = profile ?: return@LaunchedEffect
+        if (!loaded) return@LaunchedEffect
+        val snapshot = p to planNames
+        while (snapshot != syncedProfile) {
+            try {
+                CloudRepository.saveProfile(p, planNames)
+                syncedProfile = snapshot
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                delay(5000)
+            }
+        }
+    }
+    LaunchedEffect(history, loaded) {
+        if (!loaded) return@LaunchedEffect
+        val pending = history.filter { it.sessionId != null && it.kind != WorkoutRecordKind.LEGACY && it.sessionId !in syncedIds }
+        if (pending.isEmpty()) return@LaunchedEffect
+        while (true) {
+            try {
+                CloudRepository.saveRecords(pending)
+                syncedIds = syncedIds + pending.mapNotNull { it.sessionId }
+                break
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                delay(5000)
+            }
+        }
+    }
     val catalogue = remember { RecommendationEngine.getAllExercises() }
     val plan = planNames.mapNotNull { name -> catalogue.find { it.name == name } }
     val exercise = catalogue.find { it.name == activeExerciseName }
@@ -86,6 +145,7 @@ fun AppNavigation(workoutSession: WorkoutSessionViewModel, onSignOut: () -> Unit
     }
 
     when {
+        !loaded -> CloudLoadScreen(loadError, { attempt++ }, onSignOut)
         currentProfile == null -> OnboardingScreen {
             profile = it
             tab = Tab.Home
