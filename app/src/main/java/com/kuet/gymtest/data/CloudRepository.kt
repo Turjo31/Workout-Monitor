@@ -21,7 +21,9 @@ internal data class ProfileRow(
     val goal: String,
     @SerialName("fitness_level") val fitnessLevel: String,
     val equipment: String,
-    @SerialName("plan_names") val planNames: List<String>
+    @SerialName("plan_names") val planNames: List<String>,
+    // No default on purpose: it is always sent, so clearing the name in the app also clears it in the cloud.
+    @SerialName("display_name") val displayName: String?
 )
 
 @Serializable
@@ -43,20 +45,20 @@ object CloudRepository {
 
     suspend fun load(): CloudData {
         val profileRow = db.from("profiles")
-            .select(Columns.list("user_id", "age", "gender", "goal", "fitness_level", "equipment", "plan_names"))
+            .select(Columns.list("user_id", "age", "gender", "goal", "fitness_level", "equipment", "plan_names", "display_name"))
             .decodeSingleOrNull<ProfileRow>()
         val rows = db.from("workout_records")
             .select(Columns.list("user_id", "session_id", "exercise_name", "performed_at", "kind",
                 "per_set_reps", "target_sets", "target_reps"))
             .decodeList<RecordRow>()
-        val profile = profileRow?.let { UserProfile(it.age, it.gender, it.goal, it.fitnessLevel, it.equipment) }
+        val profile = profileRow?.let { UserProfile(it.age, it.gender, it.goal, it.fitnessLevel, it.equipment, it.displayName.orEmpty()) }
         return CloudData(profile, profileRow?.planNames.orEmpty(), rows.mapNotNull { it.toRecord() })
     }
 
     suspend fun saveProfile(profile: UserProfile, planNames: List<String>) {
         db.from("profiles").upsert(
             ProfileRow(userId(), profile.age, profile.gender, profile.goal, profile.fitnessLevel,
-                profile.equipment, planNames)
+                profile.equipment, planNames, profile.name.trim().ifBlank { null })
         ) { onConflict = "user_id" }
     }
 
