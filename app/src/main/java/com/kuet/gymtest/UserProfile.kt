@@ -5,5 +5,6 @@ data class UserProfile(
     val gender: String,
     val goal: String,
     val fitnessLevel: String,
-    val equipment: String
+    val equipment: String,
+    val name: String = ""
 )

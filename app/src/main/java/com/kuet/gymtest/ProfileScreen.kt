@@ -23,13 +23,15 @@ import com.kuet.gymtest.ui.components.*
 import com.kuet.gymtest.ui.theme.*
 import java.text.DateFormat
 import java.util.Date
-
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.ui.text.input.KeyboardCapitalization
 private const val WEEKLY_WORKOUT_TARGET = 3
 
 @Composable
 fun ProfileScreen(
     initial: UserProfile?, history: List<WorkoutRecord>, plan: List<Exercise>,
-    onSubmit: (UserProfile) -> Unit, onOpenPlan: () -> Unit, onCamera: () -> Unit
+    onSubmit: (UserProfile) -> Unit, onOpenPlan: () -> Unit, onCamera: () -> Unit,
+    onSignOut: () -> Unit = {}
 ) {
     val profile = initial ?: return
     var editing by rememberSaveable { mutableStateOf(false) }
@@ -65,7 +67,7 @@ fun ProfileScreen(
                     }
                     Spacer(Modifier.width(Space.Lg))
                     Column(Modifier.weight(1f)) {
-                        Text("Your fitness profile", style = MaterialTheme.typography.titleLarge)
+                        Text(profile.name.ifBlank { "Your fitness profile" }, style = MaterialTheme.typography.titleLarge)
                         Text("${profile.age} years · ${profile.gender}", color = MutedInk,
                             style = MaterialTheme.typography.bodyMedium)
                         Text(profile.fitnessLevel, color = Forest, style = MaterialTheme.typography.labelMedium)
@@ -136,6 +138,7 @@ fun ProfileScreen(
         item { ProfileAction(Icons.Default.FitnessCenter, "Your workout plan", "${plan.size} selected exercises", onOpenPlan) }
         item { ProfileAction(Icons.Default.CameraAlt, "Pose preview", "Open the camera and live pose overlay", onCamera) }
         item { ProfileAction(Icons.Default.Info, "About your data", "How your profile and workouts are kept") { showDataInfo = true } }
+        item { ProfileAction(Icons.AutoMirrored.Filled.Logout, "Log out", "Sign out of this account", onSignOut) }
         item { Text("Workout-Monitor · Move with intention", color = MutedInk,
             style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = Space.Sm)) }
     }
@@ -145,7 +148,7 @@ fun ProfileScreen(
         onDismissRequest = { showDataInfo = false },
         icon = { Icon(Icons.Default.PrivacyTip, null) },
         title = { Text("Your workout data") },
-        text = { Text("Pose detection runs on your device. This app does not upload camera frames. Your profile, plan and workout history are currently held locally in the app session. They can be restored after rotation, but are not stored as a permanent account.") },
+        text = { Text("Pose detection runs on your device. This app does not upload camera frames. Your profile, plan and workout history are saved to your account so they follow you across sessions.") },
         confirmButton = { TextButton(onClick = { showDataInfo = false }) { Text("Got it") } },
         containerColor = IvoryLight
     )
@@ -176,6 +179,7 @@ private fun ProfileAction(icon: ImageVector, title: String, subtitle: String, on
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditProfileSheet(profile: UserProfile, onDismiss: () -> Unit, onSave: (UserProfile) -> Unit) {
+    var name by rememberSaveable { mutableStateOf(profile.name) }
     var age by rememberSaveable { mutableStateOf(profile.age.toString()) }
     var gender by rememberSaveable { mutableStateOf(profile.gender) }
     var goal by rememberSaveable { mutableStateOf(profile.goal) }
@@ -195,6 +199,12 @@ private fun EditProfileSheet(profile: UserProfile, onDismiss: () -> Unit, onSave
                 Text("Make it personal", style = MaterialTheme.typography.headlineMedium)
                 Text("Your preferences set the starting point for recommendations.", color = MutedInk)
                 OutlinedTextField(
+                    value = name, onValueChange = { name = it.take(30) },
+                    label = { Text("Name (optional)") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    modifier = Modifier.fillMaxWidth(), shape = WorkoutShapes.Control
+                )
+                OutlinedTextField(
                     value = age, onValueChange = { age = it.filter(Char::isDigit).take(3) },
                     label = { Text("Age") }, supportingText = { Text("Enter an age from 10 to 100") },
                     singleLine = true, isError = age.isNotEmpty() && !valid,
@@ -209,7 +219,7 @@ private fun EditProfileSheet(profile: UserProfile, onDismiss: () -> Unit, onSave
                     color = MutedInk, style = MaterialTheme.typography.bodySmall)
             }
             WorkoutPrimaryButton("Save changes", {
-                ageValue?.takeIf { it in 10..100 }?.let { onSave(UserProfile(it, gender, goal, level, equipment)) }
+                ageValue?.takeIf { it in 10..100 }?.let { onSave(UserProfile(it, gender, goal, level, equipment, name.trim())) }
             }, Modifier.fillMaxWidth().padding(Space.Lg), enabled = valid, icon = Icons.Default.Check)
         }
     }

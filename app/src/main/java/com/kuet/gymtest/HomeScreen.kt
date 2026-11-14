@@ -46,7 +46,8 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(DayUtils.greeting() + ",", color = MutedInk, style = MaterialTheme.typography.bodyLarge)
+                        Text(DayUtils.greeting() + if (profile.name.isBlank()) "," else ", ${profile.name}",
+                            color = MutedInk, style = MaterialTheme.typography.bodyLarge)
                         Text("Ready to move?", style = MaterialTheme.typography.headlineLarge)
                     }
                     GlassCard(padding = PaddingValues(Space.Xs), shape = CircleShape) {
