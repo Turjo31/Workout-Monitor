@@ -47,7 +47,7 @@ class PoseDetector(
     @Volatile private var closed = false
     private val landmarker = PoseLandmarker.createFromOptions(context,
         PoseLandmarker.PoseLandmarkerOptions.builder()
-            .setBaseOptions(BaseOptions.builder().setModelAssetPath("pose_landmarker_lite.task").build())
+            .setBaseOptions(BaseOptions.builder().setModelAssetPath("pose_landmarker_full.task").build()) // Change full to heavy/lite
             .setRunningMode(RunningMode.LIVE_STREAM).setNumPoses(1)
             .setMinPoseDetectionConfidence(.5f).setMinPosePresenceConfidence(.5f).setMinTrackingConfidence(.5f)
             .setResultListener { result, input ->
