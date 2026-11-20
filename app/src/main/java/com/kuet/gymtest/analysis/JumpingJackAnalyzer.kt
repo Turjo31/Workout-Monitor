@@ -49,7 +49,7 @@ data class JumpingJackConfig(
     val maximumTransientTrackingMs: Long = 300, val maximumTransientTrackingFrames: Int = 2,
     val filterMs: Double = 50.0, val visibility: Float = .65f,
     val presence: Float = .5f, val edgeMargin: Float = .02f,
-    val minimumSegment: Double = .025
+    val minimumSegment: Double = .025, val maximumWristHeightDifference: Double = .12
 ) {
     init {
         require(listOf(closedLegAngle, closedLegExitAngle, openLegExitAngle, openLegAngle)
@@ -65,6 +65,7 @@ data class JumpingJackConfig(
         require(filterMs.isFinite() && filterMs > 0 && minimumSegment.isFinite() && minimumSegment > 0)
         require(listOf(visibility, presence).all { it.isFinite() && it in 0f..1f })
         require(edgeMargin.isFinite() && edgeMargin in 0f.. .25f)
+        require(maximumWristHeightDifference.isFinite() && maximumWristHeightDifference > 0)
     }
 }
 
@@ -84,6 +85,7 @@ class JumpingJackAnalyzer(
     private var countedAt: Long? = null
     private var lastValidAt: Long? = null
     private var transientTrackingFrames = 0
+    private var openWristDifference = 0.0
 
     override fun reset() {
         repetitions = 0
@@ -101,6 +103,7 @@ class JumpingJackAnalyzer(
         countedAt = null
         lastValidAt = null
         transientTrackingFrames = 0
+        openWristDifference = 0.0
         // Keep previous: invalidation must not reopen the timestamp/sequence acceptance gate.
     }
 
@@ -267,7 +270,10 @@ class JumpingJackAnalyzer(
                 transition(JumpingJackPhase.OPENING)
             }
             JumpingJackPhase.OPENING -> {
-                if (confirm("open", isOpen, now, config.openMs)) transition(JumpingJackPhase.OPEN)
+                if (confirm("open", isOpen, now, config.openMs)) {
+                    openWristDifference = abs(metrics.leftWristHeight - metrics.rightWristHeight)
+                    transition(JumpingJackPhase.OPEN)
+                }
                 else if (confirm("partial", isClosed, now, config.closedMs)) transition(JumpingJackPhase.CLOSED)
             }
             JumpingJackPhase.OPEN -> if (leavesOpen) transition(JumpingJackPhase.CLOSING)
@@ -275,7 +281,10 @@ class JumpingJackAnalyzer(
                 if (confirm("closed", isClosed, now, config.closedMs)) {
                     if (now - attemptAt >= config.minimumCycleMs) {
                         repetitions++
-                        event = RepetitionCompleted(repetitions, now)
+                        event = RepetitionCompleted(repetitions, now,
+                            if (openWristDifference <= config.maximumWristHeightDifference)
+                                RepAssessment(RepFormQuality.GOOD, "Both arms raised evenly")
+                            else RepAssessment(RepFormQuality.NEEDS_ATTENTION, "Raise both arms evenly"))
                         countedAt = now
                         transition(JumpingJackPhase.CLOSED)
                     } else invalidateTracking(DiscontinuityReason.TRACKING)

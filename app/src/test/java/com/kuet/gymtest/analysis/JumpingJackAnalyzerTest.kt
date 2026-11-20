@@ -41,6 +41,21 @@ private fun jackFrame(time: Long, leftArm: Double = 0.0, rightArm: Double = left
 }
 
 class JumpingJackAnalyzerTest {
+    @Test fun countedJacksCarryObservedArmSymmetryAssessment() {
+        val balanced = Stream(); balanced.ready(); balanced.cycle()
+        assertEquals(RepFormQuality.GOOD,
+            balanced.results.single { it.repetition != null }.repetition!!.assessment!!.quality)
+
+        val uneven = Stream(); uneven.ready()
+        uneven.move(170.0, 35.0, rightArm = 130.0)
+        uneven.move(170.0, 35.0, 250, rightArm = 130.0)
+        uneven.move(0.0, 0.0)
+        uneven.ready()
+        assertEquals(1, uneven.count)
+        assertEquals(RepFormQuality.NEEDS_ATTENTION,
+            uneven.results.single { it.repetition != null }.repetition!!.assessment!!.quality)
+    }
+
     private val compactLegFrame: (Long, Double, Double, Double, Double) -> PoseFrame = { t, la, ra, ll, rl ->
         jackFrame(t, la, ra, ll, rl, hipOffset = .025, legReach = .22)
     }

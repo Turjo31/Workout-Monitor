@@ -31,6 +31,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kuet.gymtest.analysis.ExerciseMonitorDefinition
+import com.kuet.gymtest.analysis.AndroidVoiceCoach
+import com.kuet.gymtest.analysis.VoiceFeedbackPolicy
 import com.kuet.gymtest.session.*
 import com.kuet.gymtest.ui.components.*
 import com.kuet.gymtest.ui.theme.*
@@ -43,6 +45,10 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
     val ui by viewModel.state.collectAsStateWithLifecycle()
+    val voiceCoach = remember(context) { AndroidVoiceCoach(context) }
+    val voicePolicy = remember { VoiceFeedbackPolicy() }
+    var voiceEnabled by rememberSaveable { mutableStateOf(true) }
+    DisposableEffect(voiceCoach) { onDispose { voiceCoach.close() } }
     LaunchedEffect(exercise.name) { viewModel.open(exercise.name, exercise.defaultSets, exercise.defaultReps) }
     var hasCamera by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
     var requested by rememberSaveable { mutableStateOf(false) }
@@ -71,6 +77,17 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
         onDispose { lifecycle.lifecycle.removeObserver(observer); viewModel.pause() }
     }
     val p = ui.progress ?: return
+    LaunchedEffect(ui.analysis, p.status, camera.ready, voiceEnabled) {
+        val analysis = ui.analysis
+        val finalSetRep = p.status == SessionStatus.BETWEEN_SETS && analysis?.repetition != null
+        if (!voiceEnabled || !camera.ready ||
+            (p.status !in listOf(SessionStatus.RUNNING, SessionStatus.COMPLETE) && !finalSetRep)) {
+            voiceCoach.stop()
+            voicePolicy.reset()
+        } else if (analysis != null) {
+            voicePolicy.observe(analysis)?.let(voiceCoach::speak)
+        }
+    }
     LaunchedEffect(p.sessionId, p.currentSet, p.status) {
         if (monitor.summariesEnabled &&
             (p.status == SessionStatus.BETWEEN_SETS || p.status == SessionStatus.COMPLETE))
@@ -171,6 +188,10 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
                         }
                         IconButton(onClick = { viewModel.pause(); confirmReset = true }, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Default.RestartAlt, "Reset workout", tint = CameraInk)
+                        }
+                        IconButton(onClick = { voiceEnabled = !voiceEnabled }, modifier = Modifier.size(48.dp)) {
+                            Icon(if (voiceEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                                if (voiceEnabled) "Turn voice coaching off" else "Turn voice coaching on", tint = CameraInk)
                         }
                         IconButton(onClick = {
                             viewModel.pause(); camera = PoseCameraStatus(false, "Switching camera…", camera.lens)
