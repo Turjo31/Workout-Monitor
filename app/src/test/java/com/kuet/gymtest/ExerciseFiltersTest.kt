@@ -6,6 +6,14 @@ import org.junit.Test
 
 class ExerciseFiltersTest {
     @Test
+    fun squatJumpingJacksAndPushUpUseSharedSetAndSessionSummaries() {
+        listOf("Bodyweight Squat", "Jumping Jacks", "Push-up").forEach { name ->
+            val monitor = requireNotNull(ExerciseMonitorRegistry.find(name))
+            assertTrue("$name should show measured set/session summaries", monitor.summariesEnabled)
+        }
+    }
+
+    @Test
     fun clearingFiltersRestoresTheCompleteCatalogue() {
         assertEquals(
             RecommendationEngine.getAllExercises().map { it.name }.toSet(),
