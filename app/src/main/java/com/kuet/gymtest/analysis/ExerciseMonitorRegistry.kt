@@ -23,12 +23,16 @@ object ExerciseMonitorRegistry {
             exerciseName = "Bodyweight Squat",
             monitoringLabel = "Side-view squat monitoring",
             setupGuidance = "Stand sideways with your head and feet visible",
+            formIssueLabel = "Form needs attention",
+            summariesEnabled = true,
             createAnalyzer = { SquatAnalyzer() }
         ),
         ExerciseMonitorDefinition(
             exerciseName = "Push-up",
             monitoringLabel = "Side-view push-up monitoring",
             setupGuidance = "Place the phone at floor level to your side, in plank position with your whole body visible",
+            formIssueLabel = "Form needs attention",
+            summariesEnabled = true,
             createAnalyzer = { PushUpAnalyzer(diagnostic = { line ->
                 // Keep Android logging outside the pure analyzer for local JVM tests.
                 runCatching { Log.d("PushUpTrace", line) }
@@ -38,6 +42,8 @@ object ExerciseMonitorRegistry {
             exerciseName = "Jumping Jacks",
             monitoringLabel = "Front-view jumping jack monitoring",
             setupGuidance = "Face the camera with your whole body visible and room above your raised hands",
+            formIssueLabel = "Form needs attention",
+            summariesEnabled = true,
             createAnalyzer = { JumpingJackAnalyzer(diagnostic = { line ->
                 // The pure analyzer also runs in local JVM tests, where Android Log is a stub.
                 runCatching { Log.d("JumpingJackTrace", line) }
