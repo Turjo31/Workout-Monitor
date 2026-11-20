@@ -52,7 +52,8 @@ data class SquatConfig(
     val maximumSegmentChange: Double = .35, val chainVisibility: Float = .65f,
     val presence: Float = .5f, val framingVisibility: Float = .5f, val edgeMargin: Float = .02f,
     val minimumSegment: Double = .025, val shoulderRatio: Double = .75,
-    val hipRatio: Double = .55, val orientationMs: Long = 300
+    val hipRatio: Double = .55, val orientationMs: Long = 300,
+    val goodDepthAngle: Double = 90.0
 ) {
     init {
         require(bottomEntry > 0 && bottomEntry < bottomExit && bottomExit < descent &&
@@ -62,6 +63,7 @@ data class SquatConfig(
         require(listOf(readinessMs, phaseMs, finalStandingMs, minimumCycleMs, maximumGapMs, orientationMs).all { it > 0 })
         require(maximumSegmentChange in 0.0..1.0 && edgeMargin in 0f.. .25f && minimumSegment > 0)
         require(listOf(chainVisibility, presence, framingVisibility).all { it in 0f..1f })
+        require(goodDepthAngle.isFinite() && goodDepthAngle in 1.0..bottomEntry)
     }
 }
 
@@ -216,7 +218,10 @@ class SquatAnalyzer(private val config: SquatConfig = SquatConfig()) : ExerciseA
                 if (confirm("top", standing, now, config.finalStandingMs)) {
                     if (now - attemptAt >= config.minimumCycleMs) {
                         repetitions++
-                        event = RepetitionCompleted(repetitions, now)
+                        event = RepetitionCompleted(repetitions, now,
+                            if (minimum <= config.goodDepthAngle)
+                                RepAssessment(RepFormQuality.GOOD, "Depth target reached")
+                            else RepAssessment(RepFormQuality.NEEDS_ATTENTION, "Try lowering a little farther"))
                         targetReached = false
                         countedAt = now
                         transition(SquatPhase.STANDING)

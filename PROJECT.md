@@ -1,5 +1,7 @@
 # Project requirements
 
+Voice coaching (implemented locally 2026-11-21): During a measured workout, English voice coaching can be toggled on/off. It announces readiness, speaks each counted rep number, adds a short note for needs-attention reps, and gives delayed, cooldown-limited tracking or phase guidance. Squat depth and Jumping Jacks arm-height symmetry now produce provisional per-rep assessments; these observations do not establish complete form quality or medical safety. Actual phone audio behavior remains unverified.
+
 Workout summary persistence (2026-11-18): New measured workout records retain the complete per-set summary—good, needs-attention and unassessed counted reps, plus observed incomplete and tracking-interrupted attempts—through saved state and the existing Supabase `workout_records` history. Session totals and completion remain derived from these ledgers and existing targets rather than stored redundantly. Existing records without detail load as unassessed with no invented attempts. The additive remote migration is prepared but not applied by the agent.
 
 Forward Lunge descent fix (2026-11-08): A step is now remembered after two qualifying frames; the knee may then bend while hip-relative foot travel shrinks. Bottom still requires a bent knee, a small residual travel guard and timed confirmation; a rep counts only after returning to standing. This addresses the observed trace but physical counting remains unverified. The earlier 0.60 same-frame bottom requirement below is historical.

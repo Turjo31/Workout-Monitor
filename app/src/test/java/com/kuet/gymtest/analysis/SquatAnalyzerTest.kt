@@ -23,6 +23,15 @@ fun squatFrame(time: Long, angle: Double = 178.0, epoch: Long = 1): PoseFrame {
 }
 
 class SquatAnalyzerTest {
+    @Test fun countedSquatsCarryDepthOnlyAssessment() {
+        val deep = Stream(); deep.cycle(85.0)
+        assertEquals(RepFormQuality.GOOD, deep.results.single { it.repetition != null }.repetition!!.assessment!!.quality)
+        val justDeepEnough = Stream(); justDeepEnough.cycle(97.0)
+        val assessment = justDeepEnough.results.single { it.repetition != null }.repetition!!.assessment!!
+        assertEquals(RepFormQuality.NEEDS_ATTENTION, assessment.quality)
+        assertEquals("Try lowering a little farther", assessment.note)
+    }
+
     @Test fun irregularIntervalsAndLongBottomHoldCountOnce() {
         val analyzer = SquatAnalyzer()
         var time = 0L

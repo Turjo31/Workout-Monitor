@@ -23,7 +23,7 @@ object ExerciseMonitorRegistry {
             exerciseName = "Bodyweight Squat",
             monitoringLabel = "Side-view squat monitoring",
             setupGuidance = "Stand sideways with your head and feet visible",
-            formIssueLabel = "Form needs attention",
+            formIssueLabel = "Squat depth needs attention",
             summariesEnabled = true,
             createAnalyzer = { SquatAnalyzer() }
         ),
@@ -42,7 +42,7 @@ object ExerciseMonitorRegistry {
             exerciseName = "Jumping Jacks",
             monitoringLabel = "Front-view jumping jack monitoring",
             setupGuidance = "Face the camera with your whole body visible and room above your raised hands",
-            formIssueLabel = "Form needs attention",
+            formIssueLabel = "Arm height uneven",
             summariesEnabled = true,
             createAnalyzer = { JumpingJackAnalyzer(diagnostic = { line ->
                 // The pure analyzer also runs in local JVM tests, where Android Log is a stub.

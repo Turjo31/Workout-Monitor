@@ -1,5 +1,7 @@
 # Architecture decision log
 
+2026-11-21 - Put English voice timing and repetition announcements in a pure screen-consumed policy, with Android TextToSpeech lifecycle owned by the measured screen. Speak each accepted rep ordinal, while delaying and limiting repeated coaching. Assess counted squat depth and jumping-jack arm-height symmetry using existing 2D measurements without changing count gates. Treat these form results as provisional and require physical calibration before claiming accuracy.
+
 2026-11-18 - Extend the existing idempotent `workout_records` row with five per-set integer arrays for counted-rep form and observed-attempt categories. Do not create a second summary table or persist redundant aggregate totals. Treat pre-feature measured history as unassessed with zero observed attempts because historical detail cannot be reconstructed. Apply the additive Supabase migration before deploying the updated app.
 
 2026-11-08 - Supersede the same-frame Forward Lunge bottom-travel gate after a second phone trace showed hip-relative travel falling from ~0.60 on the step to ~0.35 during deep knee bend. Latch a step only after two qualifying frames, then use knee depth and a loose residual-travel guard at bottom. Keep timed bottom and standing-return requirements, reject foot-return-before-bend and knee-only motion, and treat thresholds as provisional until phone validation.
