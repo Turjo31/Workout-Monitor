@@ -12,18 +12,7 @@ object CameraFrameConversion {
     fun convert(buffer: ByteBuffer, rowStride: Int, pixelStride: Int, crop: Rect, rotation: Int): Converted {
         require(crop.width() > 0 && crop.height() > 0 && crop.left >= 0 && crop.top >= 0)
         require(rotation in listOf(0, 90, 180, 270) && pixelStride >= 4 && rowStride > 0)
-        val copy = buffer.duplicate()
-        val base = copy.position()
-        val pixels = IntArray(crop.width() * crop.height())
-        for (y in 0 until crop.height()) for (x in 0 until crop.width()) {
-            val index = base + (y + crop.top) * rowStride + (x + crop.left) * pixelStride
-            val r = copy.get(index).toInt() and 255
-            val g = copy.get(index + 1).toInt() and 255
-            val b = copy.get(index + 2).toInt() and 255
-            val a = copy.get(index + 3).toInt() and 255
-            pixels[y * crop.width() + x] = (a shl 24) or (r shl 16) or (g shl 8) or b
-        }
-        val cropped = Bitmap.createBitmap(pixels, crop.width(), crop.height(), Bitmap.Config.ARGB_8888)
+        val cropped = copyCrop(buffer, rowStride, pixelStride, crop)
         try {
             val rotate = Matrix().apply { postRotate(rotation.toFloat()) }
             val bounds = RectF(0f, 0f, crop.width().toFloat(), crop.height().toFloat())
@@ -39,5 +28,47 @@ object CameraFrameConversion {
             if (model !== cropped) cropped.recycle()
             return Converted(model, inverse)
         } catch (error: Exception) { cropped.recycle(); throw error }
+    }
+
+    private fun copyCrop(buffer: ByteBuffer, rowStride: Int, pixelStride: Int, crop: Rect): Bitmap {
+        val source = buffer.duplicate()
+        val base = source.position()
+        val width = crop.width()
+        val height = crop.height()
+        if (pixelStride == 4) {
+            val rowBytes = width * 4
+            val first = base + crop.top * rowStride + crop.left * 4
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            try {
+                if (rowStride == rowBytes && crop.left == 0) {
+                    source.position(first)
+                    bitmap.copyPixelsFromBuffer(source)
+                } else {
+                    val packed = ByteBuffer.allocate(rowBytes * height)
+                    for (y in 0 until height) {
+                        val row = source.duplicate()
+                        row.position(first + y * rowStride)
+                        row.limit(row.position() + rowBytes)
+                        packed.put(row)
+                    }
+                    packed.position(0)
+                    bitmap.copyPixelsFromBuffer(packed)
+                }
+                return bitmap
+            } catch (error: Exception) {
+                bitmap.recycle()
+                throw error
+            }
+        }
+        val pixels = IntArray(width * height)
+        for (y in 0 until height) for (x in 0 until width) {
+            val index = base + (y + crop.top) * rowStride + (x + crop.left) * pixelStride
+            val r = source.get(index).toInt() and 255
+            val g = source.get(index + 1).toInt() and 255
+            val b = source.get(index + 2).toInt() and 255
+            val a = source.get(index + 3).toInt() and 255
+            pixels[y * width + x] = (a shl 24) or (r shl 16) or (g shl 8) or b
+        }
+        return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
     }
 }

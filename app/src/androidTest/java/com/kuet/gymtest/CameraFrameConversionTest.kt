@@ -14,6 +14,20 @@ import java.nio.ByteBuffer
 
 @RunWith(AndroidJUnit4::class)
 class CameraFrameConversionTest {
+    @Test fun packedRgbaUsesOriginalBufferPositionAndPreservesColors() {
+        val bytes = ByteBuffer.allocateDirect(5 + 2 * 2 * 4)
+        bytes.position(5)
+        for (y in 0..1) for (x in 0..1) {
+            val offset = 5 + (y * 2 + x) * 4
+            bytes.put(offset, (x * 60).toByte()); bytes.put(offset + 1, (y * 70).toByte())
+            bytes.put(offset + 2, 30); bytes.put(offset + 3, 255.toByte())
+        }
+        val converted = CameraFrameConversion.convert(bytes, 8, 4, Rect(0, 0, 2, 2), 0)
+        assertEquals(Color.argb(255, 60, 70, 30), converted.bitmap.getPixel(1, 1))
+        assertEquals(5, bytes.position())
+        converted.bitmap.recycle()
+    }
+
     @Test fun paddedRgbaCropAndAllRotationsMatchInverseMapping() {
         val bytes = ByteBuffer.allocate(5 + 24 * 4)
         bytes.position(5)

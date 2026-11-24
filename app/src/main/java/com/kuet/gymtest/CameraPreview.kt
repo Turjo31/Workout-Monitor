@@ -1,5 +1,6 @@
 package com.kuet.gymtest
 
+import android.util.Range
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -28,7 +29,9 @@ fun CameraPreview(
         var active = true
         var provider: ProcessCameraProvider? = null
         val rotation = previewView.display?.rotation ?: android.view.Surface.ROTATION_0
-        val preview = Preview.Builder().setTargetRotation(rotation).build().also { it.surfaceProvider = previewView.surfaceProvider }
+        val preview = Preview.Builder().setTargetRotation(rotation)
+            .setTargetFrameRate(Range(30, 30))
+            .build().also { it.surfaceProvider = previewView.surfaceProvider }
         val analysis = ImageAnalysis.Builder().setTargetRotation(rotation)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888).build()

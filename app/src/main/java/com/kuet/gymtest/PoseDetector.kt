@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.SystemClock
+import android.util.Log
 import androidx.camera.core.ImageProxy
 import androidx.camera.view.transform.ImageProxyTransformFactory
 import androidx.camera.view.transform.OutputTransform
@@ -44,6 +45,10 @@ class PoseDetector(
         val image: MPImage, val bitmap: Bitmap, val source: OutputTransform, val inverse: Matrix)
     private val pending = AtomicReference<Pending?>(null)
     private val clock = FrameClock()
+    private var perfWindowStartNs = 0L
+    private var perfCallbacks = 0
+    private var perfSubmitted = 0
+    private var perfConversionNs = 0L
     @Volatile private var closed = false
     private val landmarker = PoseLandmarker.createFromOptions(context,
         PoseLandmarker.PoseLandmarkerOptions.builder()
@@ -71,6 +76,7 @@ class PoseDetector(
             .build())
 
     fun detect(proxy: ImageProxy, key: FrameKey) {
+        if (BuildConfig.DEBUG) recordPerformanceCallback()
         if (closed || pending.get() != null) { proxy.close(); return }
         var model: Bitmap? = null
         try {
@@ -80,15 +86,35 @@ class PoseDetector(
             val rotation = proxy.imageInfo.rotationDegrees
             val source = ImageProxyTransformFactory().getOutputTransform(proxy)
             val plane = proxy.planes[0]
+            val conversionStartNs = SystemClock.elapsedRealtimeNanos()
             val converted = CameraFrameConversion.convert(plane.buffer, plane.rowStride, plane.pixelStride, crop, rotation)
+            if (BuildConfig.DEBUG) perfConversionNs += SystemClock.elapsedRealtimeNanos() - conversionStartNs
             model = converted.bitmap
             val input = BitmapImageBuilder(model).build()
             pending.set(Pending(key, timestamp, received, input, model, source, converted.modelToRaw))
             landmarker.detectAsync(input, timestamp)
+            if (BuildConfig.DEBUG) perfSubmitted++
         } catch (error: Exception) {
             if (pending.get() == null) model?.recycle()
             onError("Camera analysis failed: ${error.message ?: "retry camera"}")
         } finally { proxy.close() }
+    }
+
+    private fun recordPerformanceCallback() {
+        val now = SystemClock.elapsedRealtimeNanos()
+        if (perfWindowStartNs == 0L) perfWindowStartNs = now
+        val elapsedNs = now - perfWindowStartNs
+        if (elapsedNs >= 1_000_000_000L) {
+            val averageConversionMs = if (perfSubmitted == 0) "n/a" else
+                "%.1f".format(java.util.Locale.US, perfConversionNs / perfSubmitted / 1_000_000.0)
+            Log.d("CameraOptimizationTrace", "windowMs=${elapsedNs / 1_000_000} " +
+                "callback=$perfCallbacks submitted=$perfSubmitted conversionAvgMs=$averageConversionMs")
+            perfWindowStartNs = now
+            perfCallbacks = 0
+            perfSubmitted = 0
+            perfConversionNs = 0L
+        }
+        perfCallbacks++
     }
 
     fun isStalled(now: Long) = pending.get()?.let { now - it.submitted > 500 } == true
