@@ -25,7 +25,10 @@ object ExerciseMonitorRegistry {
             setupGuidance = "Stand sideways with your head and feet visible",
             formIssueLabel = "Squat depth needs attention",
             summariesEnabled = true,
-            createAnalyzer = { SquatAnalyzer() }
+            createAnalyzer = { SquatAnalyzer(diagnostic = if (com.kuet.gymtest.BuildConfig.DEBUG) { line ->
+                // Diagnostic only; do not change the squat analyzer's counting decisions.
+                runCatching { Log.d("SquatTrace", line) }
+            } else null) }
         ),
         ExerciseMonitorDefinition(
             exerciseName = "Push-up",

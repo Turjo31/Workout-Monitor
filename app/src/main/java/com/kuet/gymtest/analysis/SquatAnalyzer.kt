@@ -68,7 +68,8 @@ data class SquatConfig(
 }
 
 /** Single-owner pure state machine. Invalid observations cancel motion, never accepted reps. */
-class SquatAnalyzer(private val config: SquatConfig = SquatConfig()) : ExerciseAnalyzer {
+class SquatAnalyzer(private val config: SquatConfig = SquatConfig(),
+    private val diagnostic: ((String) -> Unit)? = null) : ExerciseAnalyzer {
     private var phase = SquatPhase.NOT_READY
     private var repetitions = 0
     private var side: BodySide? = null
@@ -85,10 +86,12 @@ class SquatAnalyzer(private val config: SquatConfig = SquatConfig()) : ExerciseA
     private var broadAt: Long? = null
     private var countedAt: Long? = null
     private var shallowAt: Long? = null
+    private val segmentTrace = if (diagnostic != null) SegmentLengthTrace() else null
 
     override fun reset() {
         repetitions = 0
         previous = null
+        segmentTrace?.reset()
         invalidateTracking(DiscontinuityReason.EPOCH)
     }
 
@@ -122,6 +125,8 @@ class SquatAnalyzer(private val config: SquatConfig = SquatConfig()) : ExerciseA
     private fun transition(next: SquatPhase) { phase = next; candidate = null; candidateSamples = 0 }
 
     override fun processFrame(pose: PoseFrame): SquatAnalysisResult {
+        segmentTrace?.observe(pose)?.let { diagnostic?.invoke("frame time=${pose.timestampMs} " +
+            "seq=${pose.key.sequence} $it") }
         val old = previous
         fun result(feedback: Feedback, valid: Boolean = false, metrics: SquatMetrics? = null,
                    event: RepetitionCompleted? = null) = SquatAnalysisResult(

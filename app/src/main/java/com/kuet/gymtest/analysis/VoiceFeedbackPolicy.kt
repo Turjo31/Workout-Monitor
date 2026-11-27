@@ -35,7 +35,10 @@ class VoiceFeedbackPolicy {
         if (rep != null && result.trackingValid && rep.ordinal > lastRepOrdinal) {
             lastRepOrdinal = rep.ordinal
             pendingKey = null
-            val note = rep.assessment?.takeIf { it.quality == RepFormQuality.NEEDS_ATTENTION }?.note
+            val note = rep.assessment?.takeIf {
+                it.quality == RepFormQuality.NEEDS_ATTENTION &&
+                    result !is LateralRaiseAnalysisResult && result !is ShoulderPressAnalysisResult
+            }?.note
             return "${rep.ordinal}." + (if (note.isNullOrBlank()) "" else " $note.")
         }
 
