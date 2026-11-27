@@ -1,6 +1,7 @@
 package com.kuet.gymtest.analysis
 
 import android.util.Log
+import com.kuet.gymtest.BuildConfig
 
 /** A factory must return a fresh, independently owned analyzer on every call. */
 data class ExerciseMonitorDefinition(
@@ -25,7 +26,10 @@ object ExerciseMonitorRegistry {
             setupGuidance = "Stand sideways with your head and feet visible",
             formIssueLabel = "Squat depth needs attention",
             summariesEnabled = true,
-            createAnalyzer = { SquatAnalyzer() }
+            createAnalyzer = { SquatAnalyzer(diagnostic = if (BuildConfig.DEBUG) { line ->
+                // Keep Android logging outside the pure analyzer for local JVM tests.
+                runCatching { Log.d("SquatTrace", line) }
+            } else null) }
         ),
         ExerciseMonitorDefinition(
             exerciseName = "Push-up",

@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import android.os.SystemClock
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -48,6 +50,8 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
     val voiceCoach = remember(context) { AndroidVoiceCoach(context) }
     val voicePolicy = remember { VoiceFeedbackPolicy() }
     var voiceEnabled by rememberSaveable { mutableStateOf(true) }
+    var flareAnnounced by remember { mutableStateOf(false) }
+    var lastFlareAnnouncementMs by remember { mutableLongStateOf(-1L) }
     DisposableEffect(voiceCoach) { onDispose { voiceCoach.close() } }
     LaunchedEffect(exercise.name) { viewModel.open(exercise.name, exercise.defaultSets, exercise.defaultReps) }
     var hasCamera by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
@@ -77,15 +81,27 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
         onDispose { lifecycle.lifecycle.removeObserver(observer); viewModel.pause() }
     }
     val p = ui.progress ?: return
-    LaunchedEffect(ui.analysis, p.status, camera.ready, voiceEnabled) {
+    LaunchedEffect(ui.analysis, p.status, camera.ready, camera.lightingWarning, voiceEnabled) {
         val analysis = ui.analysis
         val finalSetRep = p.status == SessionStatus.BETWEEN_SETS && analysis?.repetition != null
-        if (!voiceEnabled || !camera.ready ||
-            (p.status !in listOf(SessionStatus.RUNNING, SessionStatus.COMPLETE) && !finalSetRep)) {
+        if (!camera.lightingWarning) flareAnnounced = false
+        if (!voiceEnabled || !camera.ready) {
             voiceCoach.stop()
             voicePolicy.reset()
-        } else if (analysis != null) {
-            voicePolicy.observe(analysis)?.let(voiceCoach::speak)
+        } else {
+            if (camera.lightingWarning && !flareAnnounced) {
+                val now = SystemClock.elapsedRealtime()
+                if (lastFlareAnnouncementMs < 0 || now - lastFlareAnnouncementMs >= 10_000) {
+                    voiceCoach.speakWarning("Bright light streak detected. Move the camera away from the light.")
+                    Log.d("CameraFlareVoiceTrace", "flare cue requested")
+                    lastFlareAnnouncementMs = now
+                }
+                flareAnnounced = true
+            }
+            if (p.status !in listOf(SessionStatus.RUNNING, SessionStatus.COMPLETE) && !finalSetRep) {
+                if (!camera.lightingWarning) voiceCoach.stop()
+                voicePolicy.reset()
+            } else if (analysis != null) voicePolicy.observe(analysis)?.let(voiceCoach::speak)
         }
     }
     LaunchedEffect(p.sessionId, p.currentSet, p.status) {
@@ -102,6 +118,7 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
     val instruction = when {
         !hasCamera -> "Allow camera access to monitor your movement"
         !camera.ready -> camera.message
+        camera.lightingWarning -> "Bright light streak may obscure tracking — move the camera away from the light"
         p.status == SessionStatus.SETUP -> monitor.setupGuidance
         p.status == SessionStatus.PAUSED -> "Paused — Resume when you are ready"
         p.status == SessionStatus.BETWEEN_SETS -> "Set complete — press Next Set when ready"

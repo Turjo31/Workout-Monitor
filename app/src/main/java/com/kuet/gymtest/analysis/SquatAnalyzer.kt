@@ -3,6 +3,7 @@ package com.kuet.gymtest.analysis
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.min
+import kotlin.math.round
 
 /** Squat-owned messages; other analyzers provide their own AnalysisFeedback values. */
 enum class Feedback(override val text: String, override val priority: Int) : AnalysisFeedback {
@@ -68,7 +69,10 @@ data class SquatConfig(
 }
 
 /** Single-owner pure state machine. Invalid observations cancel motion, never accepted reps. */
-class SquatAnalyzer(private val config: SquatConfig = SquatConfig()) : ExerciseAnalyzer {
+class SquatAnalyzer(
+    private val config: SquatConfig = SquatConfig(),
+    private val diagnostic: ((String) -> Unit)? = null
+) : ExerciseAnalyzer {
     private var phase = SquatPhase.NOT_READY
     private var repetitions = 0
     private var side: BodySide? = null
@@ -85,14 +89,18 @@ class SquatAnalyzer(private val config: SquatConfig = SquatConfig()) : ExerciseA
     private var broadAt: Long? = null
     private var countedAt: Long? = null
     private var shallowAt: Long? = null
+    private val segmentTrace = if (diagnostic != null) SegmentLengthTrace() else null
 
     override fun reset() {
         repetitions = 0
         previous = null
+        segmentTrace?.reset()
         invalidateTracking(DiscontinuityReason.EPOCH)
     }
 
     override fun invalidateTracking(reason: DiscontinuityReason) {
+        diagnostic?.invoke("invalidate reason=$reason phase=$phase side=$side previous=${previous?.timestampMs} " +
+            "attempt=${phase in listOf(SquatPhase.DESCENDING, SquatPhase.BOTTOM, SquatPhase.ASCENDING)}")
         phase = SquatPhase.NOT_READY
         side = null
         rawKnee = null
@@ -123,49 +131,119 @@ class SquatAnalyzer(private val config: SquatConfig = SquatConfig()) : ExerciseA
 
     override fun processFrame(pose: PoseFrame): SquatAnalysisResult {
         val old = previous
+        val segmentDetails = segmentTrace?.observe(pose)
+        val phaseBefore = phase
+        var dt: Long? = null
+        var rawAngle: Double? = null
+        var smoothAngle: Double? = null
+        var hipAngleForTrace: Double? = null
+        var standingForTrace: Boolean? = null
+        var bottomForTrace: Boolean? = null
+        var diagnosticOutcome: String? = null
+        var landmarkTrace: String? = null
+        var geometryTrace: String? = null
+        var jumpTrace: String? = null
         fun result(feedback: Feedback, valid: Boolean = false, metrics: SquatMetrics? = null,
-                   event: RepetitionCompleted? = null) = SquatAnalysisResult(
-            pose.key, pose.timestampMs, repetitions, event, feedback, valid, phase,
-            if (!valid) DepthStatus.UNKNOWN else if (targetReached) DepthStatus.TARGET_REACHED else DepthStatus.ABOVE_TARGET,
-            side, metrics
-        )
-        fun invalid(feedback: Feedback): SquatAnalysisResult {
+                   event: RepetitionCompleted? = null, failure: String = "none"): SquatAnalysisResult {
+            val analysis = SquatAnalysisResult(
+                pose.key, pose.timestampMs, repetitions, event, feedback, valid, phase,
+                if (!valid) DepthStatus.UNKNOWN else if (targetReached) DepthStatus.TARGET_REACHED else DepthStatus.ABOVE_TARGET,
+                side, metrics
+            )
+            diagnostic?.invoke("frame time=${pose.timestampMs} seq=${pose.key.sequence} " +
+                "from=$phaseBefore to=$phase valid=$valid failure=$failure side=$side " +
+                "dt=$dt rawKnee=$rawAngle smoothKnee=$smoothAngle hip=$hipAngleForTrace " +
+                "standing=$standingForTrace bottom=$bottomForTrace " +
+                "landmarks=$landmarkTrace geometry=$geometryTrace jump=$jumpTrace $segmentDetails " +
+                "candidate=${candidate ?: "none"} samples=$candidateSamples " +
+                "candidateMs=${if (candidate == null) 0 else pose.timestampMs - candidateAt} " +
+                "feedback=$feedback event=${event?.ordinal} assessment=${event?.assessment?.quality} " +
+                "diagnosticAttempt=$diagnosticOutcome count=$repetitions")
+            return analysis
+        }
+        fun invalid(feedback: Feedback, failure: String): SquatAnalysisResult {
+            if (phaseBefore in listOf(SquatPhase.DESCENDING, SquatPhase.BOTTOM, SquatPhase.ASCENDING)) {
+                diagnosticOutcome = "TRACKING_INTERRUPTED"
+            }
             invalidateTracking(DiscontinuityReason.TRACKING)
-            return result(feedback)
+            return result(feedback, failure = failure)
         }
         val sameEpoch = old == null || old.key.let {
             it.sessionId == pose.key.sessionId && it.cameraEpoch == pose.key.cameraEpoch && it.analysisEpoch == pose.key.analysisEpoch
         }
-        if (!sameEpoch) return invalid(Feedback.UNCERTAIN) // Owner must reset for a new epoch.
+        if (!sameEpoch) return invalid(Feedback.UNCERTAIN, "epochMismatch") // Owner must reset for a new epoch.
         if (old != null && (pose.timestampMs <= old.timestampMs || pose.key.sequence <= old.key.sequence)) {
-            return invalid(Feedback.UNCERTAIN)
+            return invalid(Feedback.UNCERTAIN, "nonMonotonic")
         }
         previous = pose
-        val dt = old?.let { pose.timestampMs - it.timestampMs }
-        if (dt != null && dt > config.maximumGapMs) invalidateTracking(DiscontinuityReason.GAP)
-        if (pose.timestampMs < 0 || pose.imageWidth <= 0 || pose.imageHeight <= 0) return invalid(Feedback.UNCERTAIN)
-        if (pose.landmarks.isEmpty()) return invalid(Feedback.NO_POSE)
+        val frameDt = old?.let { pose.timestampMs - it.timestampMs }
+        dt = frameDt
+        if (frameDt != null && frameDt > config.maximumGapMs) invalidateTracking(DiscontinuityReason.GAP)
+        if (pose.timestampMs < 0 || pose.imageWidth <= 0 || pose.imageHeight <= 0)
+            return invalid(Feedback.UNCERTAIN, "invalidFrame")
+        if (pose.landmarks.isEmpty()) return invalid(Feedback.NO_POSE, "noPose")
         fun landmark(i: Int) = pose.landmarks.getOrNull(i)
         fun confident(i: Int, threshold: Float = config.chainVisibility) =
             PoseGeometry.confident(landmark(i), threshold, config.presence)
         fun chain(s: BodySide) = listOf(s.shoulder, s.hip, s.knee, s.ankle)
         fun point(i: Int) = PoseGeometry.point(pose.landmarks[i], pose.imageWidth, pose.imageHeight)!!
+        fun lowConfidence(indices: List<Int>, threshold: Float = config.chainVisibility) =
+            indices.filterNot { confident(it, threshold) }.joinToString(",") { i ->
+                val l = landmark(i)
+                "$i(v=${l?.visibility},p=${l?.presence})"
+            }
         val chosen = side ?: BodySide.entries.filter { s -> chain(s).all { confident(it) } }
             .maxByOrNull { s -> chain(s).minOf { landmark(it)!!.visibility!! } }
-            ?: return invalid(Feedback.UNCERTAIN)
-        if (!chain(chosen).all { confident(it) }) return invalid(Feedback.UNCERTAIN)
-        if (!chain(chosen).all { PoseGeometry.inside(landmark(it)!!, config.edgeMargin) }) return invalid(Feedback.MOVE_BACK)
+            ?: return invalid(Feedback.UNCERTAIN,
+                "noConfidentLeg left=[${lowConfidence(chain(BodySide.LEFT))}] right=[${lowConfidence(chain(BodySide.RIGHT))}]")
+        if (!chain(chosen).all { confident(it) })
+            return invalid(Feedback.UNCERTAIN, "lowConfidence side=$chosen indices=[${lowConfidence(chain(chosen))}]")
+        if (!chain(chosen).all { PoseGeometry.inside(landmark(it)!!, config.edgeMargin) })
+            return invalid(Feedback.MOVE_BACK, "legOutOfFrame side=$chosen")
         if (!confident(0, config.framingVisibility) || !PoseGeometry.inside(landmark(0)!!, config.edgeMargin) ||
             listOf(chosen.heel, chosen.toe).none { confident(it, config.framingVisibility) && PoseGeometry.inside(landmark(it)!!, config.edgeMargin) }
-        ) return invalid(Feedback.FRAMING)
+        ) return invalid(Feedback.FRAMING,
+            "headOrFootFraming head=${landmark(0)?.visibility} foot=[${lowConfidence(listOf(chosen.heel, chosen.toe), config.framingVisibility)}]")
         val shoulder = point(chosen.shoulder)
         val hip = point(chosen.hip)
         val knee = point(chosen.knee)
         val ankle = point(chosen.ankle)
         val minLength = config.minimumSegment * min(pose.imageWidth, pose.imageHeight)
-        val raw = PoseGeometry.angle(hip, knee, ankle, minLength) ?: return invalid(Feedback.UNCERTAIN)
-        val hipAngle = PoseGeometry.angle(shoulder, hip, knee, minLength) ?: return invalid(Feedback.UNCERTAIN)
+        val raw = PoseGeometry.angle(hip, knee, ankle, minLength)
+            ?: return invalid(Feedback.UNCERTAIN, "invalidKneeGeometry")
+        rawAngle = raw
+        val hipAngle = PoseGeometry.angle(shoulder, hip, knee, minLength)
+            ?: return invalid(Feedback.UNCERTAIN, "invalidHipGeometry")
+        hipAngleForTrace = hipAngle
         val currentLengths = listOf(PoseGeometry.distance(shoulder, hip), PoseGeometry.distance(hip, knee), PoseGeometry.distance(knee, ankle))
+        if (diagnostic != null) {
+            fun short(value: Double) = round(value * 1000.0) / 1000.0
+            fun joint(name: String, index: Int): String {
+                val landmark = pose.landmarks[index]
+                return "$name=(${short(landmark.x.toDouble())},${short(landmark.y.toDouble())}," +
+                    "v=${landmark.visibility},p=${landmark.presence})"
+            }
+            landmarkTrace = listOf(
+                joint("shoulder", chosen.shoulder), joint("hip", chosen.hip),
+                joint("knee", chosen.knee), joint("ankle", chosen.ankle)
+            ).joinToString(";")
+            val names = listOf("torso", "thigh", "shin")
+            val changes = lengths?.zip(currentLengths)?.map { (before, current) -> abs(current - before) / before }
+            val speed = if (frameDt != null && frameDt in 1..config.maximumGapMs && rawKnee != null)
+                abs(raw - rawKnee!!) * 1000 / frameDt else null
+            geometryTrace = names.indices.joinToString(";") { index ->
+                "${names[index]}Px=${short(currentLengths[index])}" +
+                    ",change=${changes?.get(index)?.let { short(it) }}"
+            } + ";kneeSpeedDegPerSec=${speed?.let { short(it) }}"
+            val speedJump = speed != null && speed > config.maximumSpeed
+            val segmentJump = changes?.any { it > config.maximumSegmentChange } == true
+            if (speedJump || segmentJump) {
+                jumpTrace = buildList {
+                    if (speedJump) add("kneeSpeed")
+                    if (segmentJump) add("segmentLength")
+                }.joinToString("+")
+            }
+        }
         if (listOf(11, 12, 23, 24).all { confident(it) }) {
             val torso = (PoseGeometry.distance(point(11), point(23)) + PoseGeometry.distance(point(12), point(24))) / 2
             val broad = torso > minLength && PoseGeometry.distance(point(11), point(12)) / torso > config.shoulderRatio &&
@@ -174,16 +252,18 @@ class SquatAnalyzer(private val config: SquatConfig = SquatConfig()) : ExerciseA
                 val since = broadAt ?: pose.timestampMs
                 invalidateTracking(DiscontinuityReason.TRACKING)
                 broadAt = since
-                return result(if (pose.timestampMs - since >= config.orientationMs) Feedback.SIDEWAYS else Feedback.UNCERTAIN)
+                return result(if (pose.timestampMs - since >= config.orientationMs) Feedback.SIDEWAYS else Feedback.UNCERTAIN,
+                    failure = "frontFacing")
             }
         }
         broadAt = null
-        if (dt != null && dt in 1..config.maximumGapMs &&
-            (rawKnee?.let { abs(raw - it) * 1000 / dt > config.maximumSpeed } == true ||
+        if (frameDt != null && frameDt in 1..config.maximumGapMs &&
+            (rawKnee?.let { abs(raw - it) * 1000 / frameDt > config.maximumSpeed } == true ||
                 lengths?.zip(currentLengths)?.any { (a, b) -> abs(b - a) / a > config.maximumSegmentChange } == true)
-        ) return invalid(Feedback.UNCERTAIN)
+        ) return invalid(Feedback.UNCERTAIN, "geometryJump")
         side = chosen
-        val angle = filtered?.let { it + (1 - exp(-dt!!.toDouble() / config.filterMs)) * (raw - it) } ?: raw
+        val angle = filtered?.let { it + (1 - exp(-frameDt!!.toDouble() / config.filterMs)) * (raw - it) } ?: raw
+        smoothAngle = angle
         filtered = angle
         rawKnee = raw
         lengths = currentLengths
@@ -191,6 +271,8 @@ class SquatAnalyzer(private val config: SquatConfig = SquatConfig()) : ExerciseA
         val standing = raw >= config.standingEntry && angle >= config.standingEntry && hipAngle >= config.standingHip &&
             shoulder.y < hip.y && hip.y < ankle.y
         val bottom = raw <= config.bottomEntry && angle <= config.bottomEntry
+        standingForTrace = standing
+        bottomForTrace = bottom
         var event: RepetitionCompleted? = null
         if (phase in listOf(SquatPhase.DESCENDING, SquatPhase.BOTTOM, SquatPhase.ASCENDING)) minimum = min(minimum, angle)
         when (phase) {
@@ -210,6 +292,7 @@ class SquatAnalyzer(private val config: SquatConfig = SquatConfig()) : ExerciseA
                     transition(SquatPhase.BOTTOM)
                 } else if (confirm("partial", standing, now, config.finalStandingMs)) {
                     shallowAt = now
+                    diagnosticOutcome = "INCOMPLETE"
                     transition(SquatPhase.STANDING)
                 }
             }
@@ -225,7 +308,10 @@ class SquatAnalyzer(private val config: SquatConfig = SquatConfig()) : ExerciseA
                         targetReached = false
                         countedAt = now
                         transition(SquatPhase.STANDING)
-                    } else invalidateTracking(DiscontinuityReason.TRACKING)
+                    } else {
+                        diagnosticOutcome = "TOO_FAST"
+                        invalidateTracking(DiscontinuityReason.TRACKING)
+                    }
                 } else if (confirm("bottomAgain", bottom, now, config.phaseMs)) transition(SquatPhase.BOTTOM)
             }
         }

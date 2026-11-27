@@ -1,6 +1,7 @@
 package com.kuet.gymtest
 
 import android.util.Range
+import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -29,9 +30,7 @@ fun CameraPreview(
         var active = true
         var provider: ProcessCameraProvider? = null
         val rotation = previewView.display?.rotation ?: android.view.Surface.ROTATION_0
-        val preview = Preview.Builder().setTargetRotation(rotation)
-            .setTargetFrameRate(Range(30, 30))
-            .build().also { it.surfaceProvider = previewView.surfaceProvider }
+        var preview: Preview? = null
         val analysis = ImageAnalysis.Builder().setTargetRotation(rotation)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888).build()
@@ -45,12 +44,35 @@ fun CameraPreview(
                 val actual = if (cameraProvider.hasCamera(selector(lens))) lens else 1 - lens
                 check(cameraProvider.hasCamera(selector(actual))) { "No front or rear camera available" }
                 val viewport = checkNotNull(previewView.viewPort) { "Preview not laid out — retry camera" }
-                cameraProvider.bindToLifecycle(owner, selector(actual), UseCaseGroup.Builder()
-                    .setViewPort(viewport).addUseCase(preview).addUseCase(analysis).build())
+                val supported = cameraProvider.getCameraInfo(selector(actual)).supportedFrameRateRanges
+                val try60 = BuildConfig.DEBUG && supported.any { it.lower <= 60 && it.upper >= 60 }
+                val requested = if (try60) Range(60, 60) else Range(30, 30)
+                Log.d("CameraFpsTrace", "lens=$actual supported=${supported.sortedWith(compareBy({ it.lower }, { it.upper }))} requested=$requested")
+                fun bindAt(rate: Range<Int>): Preview {
+                    val candidate = Preview.Builder().setTargetRotation(rotation)
+                        .setTargetFrameRate(rate).build()
+                        .also { it.surfaceProvider = previewView.surfaceProvider }
+                    preview = candidate
+                    cameraProvider.bindToLifecycle(owner, selector(actual), UseCaseGroup.Builder()
+                        .setViewPort(viewport).addUseCase(candidate).addUseCase(analysis).build())
+                    return candidate
+                }
+                preview = try {
+                    bindAt(requested)
+                } catch (error: Exception) {
+                    if (!try60) throw error
+                    Log.w("CameraFpsTrace", "60 FPS bind failed; retrying 30 FPS", error)
+                    preview?.let { cameraProvider.unbind(it, analysis) }
+                    bindAt(Range(30, 30))
+                }
                 lensCallback(actual)
             } catch (error: Exception) { errorCallback("Camera unavailable: ${error.message ?: "retry camera"}") }
         }, ContextCompat.getMainExecutor(previewView.context))
-        onDispose { active = false; analysis.clearAnalyzer(); provider?.unbind(preview, analysis) }
+        onDispose {
+            active = false
+            analysis.clearAnalyzer()
+            preview?.let { provider?.unbind(it, analysis) }
+        }
     }
     AndroidView(factory = { previewView }, modifier = modifier.onSizeChanged { laidOut = it.width > 0 && it.height > 0 })
 }

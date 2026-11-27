@@ -27,7 +27,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
-data class PoseCameraStatus(val ready: Boolean = false, val message: String = "Starting camera…", val lens: Int = CameraSelector.LENS_FACING_FRONT)
+data class PoseCameraStatus(val ready: Boolean = false, val message: String = "Starting camera…",
+    val lens: Int = CameraSelector.LENS_FACING_FRONT, val lightingWarning: Boolean = false)
 private val cameraEpochs = AtomicLong()
 
 @Composable
@@ -136,7 +137,8 @@ private fun MountedPoseCamera(
                                     lossReported = false
                                     val lensName = if (actualLens == CameraSelector.LENS_FACING_FRONT) "Front camera" else "Rear camera"
                                     statusCallback(PoseCameraStatus(true,
-                                        lensName + if (actualLens != lens) " · requested camera unavailable" else "", actualLens))
+                                        lensName + if (actualLens != lens) " · requested camera unavailable" else "",
+                                        actualLens, result.lightingWarning))
                                     poseCallback(mapped)
                                 } catch (error: Exception) { fail("Preview alignment unavailable — retry camera") }
                             }

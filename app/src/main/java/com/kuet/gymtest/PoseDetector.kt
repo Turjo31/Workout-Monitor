@@ -25,7 +25,8 @@ typealias PoseLandmark = com.kuet.gymtest.analysis.PoseLandmark
 data class PoseResult(
     val frame: PoseFrame, val sourceTransform: OutputTransform,
     val modelToRaw: Matrix, val submittedMs: Long,
-    val displayPoints: List<Pair<Float, Float>> = emptyList()
+    val displayPoints: List<Pair<Float, Float>> = emptyList(),
+    val lightingWarning: Boolean = false
 ) {
     val landmarks get() = frame.landmarks
     val imageWidth get() = frame.imageWidth
@@ -42,9 +43,11 @@ class PoseDetector(
     private val onResult: (PoseResult) -> Unit, private val onError: (String) -> Unit
 ) {
     private data class Pending(val key: FrameKey, val time: Long, val submitted: Long,
-        val image: MPImage, val bitmap: Bitmap, val source: OutputTransform, val inverse: Matrix)
+        val image: MPImage, val bitmap: Bitmap, val source: OutputTransform, val inverse: Matrix,
+        val lightingWarning: Boolean)
     private val pending = AtomicReference<Pending?>(null)
     private val clock = FrameClock()
+    private val flareMonitor = CameraFlareMonitor()
     private var perfWindowStartNs = 0L
     private var perfCallbacks = 0
     private var perfSubmitted = 0
@@ -62,9 +65,11 @@ class PoseDetector(
                         PoseLandmark(it.x(), it.y(), it.z(), it.visibility().orElse(null), it.presence().orElse(null))
                     }.orEmpty()
                     val pose = PoseResult(PoseFrame(slot.key, slot.time, input.width, input.height, landmarks),
-                        slot.source, Matrix(slot.inverse), slot.submitted)
+                        slot.source, Matrix(slot.inverse), slot.submitted,
+                        lightingWarning = slot.lightingWarning)
                     worker.execute {
                         if (!closed) {
+                            flareMonitor.onPose(landmarks, input.width, input.height)
                             releasePending()
                             if (SystemClock.elapsedRealtime() - slot.submitted <= 500) onResult(pose)
                             else onError("Pose processing delayed — retry camera")
@@ -90,8 +95,9 @@ class PoseDetector(
             val converted = CameraFrameConversion.convert(plane.buffer, plane.rowStride, plane.pixelStride, crop, rotation)
             if (BuildConfig.DEBUG) perfConversionNs += SystemClock.elapsedRealtimeNanos() - conversionStartNs
             model = converted.bitmap
+            val lightingWarning = flareMonitor.onFrame(model, received)
             val input = BitmapImageBuilder(model).build()
-            pending.set(Pending(key, timestamp, received, input, model, source, converted.modelToRaw))
+            pending.set(Pending(key, timestamp, received, input, model, source, converted.modelToRaw, lightingWarning))
             landmarker.detectAsync(input, timestamp)
             if (BuildConfig.DEBUG) perfSubmitted++
         } catch (error: Exception) {

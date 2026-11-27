@@ -2,8 +2,10 @@ package com.kuet.gymtest.session
 
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import com.kuet.gymtest.BuildConfig
 import com.kuet.gymtest.analysis.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -75,6 +77,10 @@ class WorkoutSessionViewModel internal constructor(
                 try {
                     if (!synchronized(lock) { controller?.accepts(frame.key) == true }) return@execute
                     if (overflow.getAndSet(false)) {
+                        if (BuildConfig.DEBUG && controller?.state?.exerciseName == "Bodyweight Squat") {
+                            Log.d("SquatTrace", "worker overflow time=${frame.timestampMs} seq=${frame.key.sequence} " +
+                                "analysisEpoch=${frame.key.analysisEpoch}")
+                        }
                         synchronized(lock) {
                             controller?.recordTrackingInterruption()
                             publish()

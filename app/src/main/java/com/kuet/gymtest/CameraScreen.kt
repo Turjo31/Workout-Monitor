@@ -50,7 +50,9 @@ fun CameraScreen(onBack: () -> Unit = {}) {
             fill = CameraGlass, border = GlassBorder.copy(alpha = .3f)
         ) {
             Icon(Icons.Default.CheckCircleOutline, null, tint = TrackingGreen)
-            Text(if (!camera.ready) camera.message else if (tracking) "Pose detected" else "Find a little room to move",
+            Text(if (!camera.ready) camera.message else if (camera.lightingWarning)
+                "Bright light streak — move the camera away from the light"
+                else if (tracking) "Pose detected" else "Find a little room to move",
                 color = CameraInk, style = MaterialTheme.typography.titleLarge)
             Text("Stand back until your full body is visible. The overlay follows your movement.",
                 color = CameraInk.copy(alpha = .85f), style = MaterialTheme.typography.bodyMedium)
