@@ -39,12 +39,14 @@ val POSE_CONNECTIONS = listOf(11 to 12, 11 to 13, 13 to 15, 12 to 14, 14 to 16,
 @androidx.annotation.OptIn(markerClass = [androidx.camera.view.TransformExperimental::class])
 class PoseDetector(
     context: Context, private val worker: Executor,
-    private val onResult: (PoseResult) -> Unit, private val onError: (String) -> Unit
+    private val onResult: (PoseResult) -> Unit, private val onError: (String) -> Unit,
+    private val onFlareChanged: (Boolean) -> Unit = {}
 ) {
     private data class Pending(val key: FrameKey, val time: Long, val submitted: Long,
         val image: MPImage, val bitmap: Bitmap, val source: OutputTransform, val inverse: Matrix)
     private val pending = AtomicReference<Pending?>(null)
     private val clock = FrameClock()
+    private val flareMonitor = CameraFlareMonitor(context, onFlareChanged)
     private var perfWindowStartNs = 0L
     private var perfCallbacks = 0
     private var perfSubmitted = 0
@@ -77,7 +79,16 @@ class PoseDetector(
 
     fun detect(proxy: ImageProxy, key: FrameKey) {
         if (BuildConfig.DEBUG) recordPerformanceCallback()
-        if (closed || pending.get() != null) { proxy.close(); return }
+        if (closed) { proxy.close(); return }
+        try {
+            if (pending.get() == null) submitPose(proxy, key)
+        } finally {
+            // Sample even when the pose model is busy; its inference runs on a separate worker.
+            try { flareMonitor.maybeSample(proxy) } finally { proxy.close() }
+        }
+    }
+
+    private fun submitPose(proxy: ImageProxy, key: FrameKey) {
         var model: Bitmap? = null
         try {
             val received = SystemClock.elapsedRealtime()
@@ -97,7 +108,7 @@ class PoseDetector(
         } catch (error: Exception) {
             if (pending.get() == null) model?.recycle()
             onError("Camera analysis failed: ${error.message ?: "retry camera"}")
-        } finally { proxy.close() }
+        }
     }
 
     private fun recordPerformanceCallback() {
@@ -122,6 +133,9 @@ class PoseDetector(
     fun close() {
         if (closed) return
         closed = true
-        try { landmarker.close() } finally { releasePending() }
+        try { landmarker.close() } finally {
+            flareMonitor.close()
+            releasePending()
+        }
     }
 }

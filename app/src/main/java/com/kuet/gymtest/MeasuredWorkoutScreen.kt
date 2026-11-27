@@ -36,6 +36,7 @@ import com.kuet.gymtest.analysis.VoiceFeedbackPolicy
 import com.kuet.gymtest.session.*
 import com.kuet.gymtest.ui.components.*
 import com.kuet.gymtest.ui.theme.*
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -59,6 +60,7 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
     var lens by rememberSaveable { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
     var retry by remember { mutableIntStateOf(0) }
     var camera by remember { mutableStateOf(PoseCameraStatus()) }
+    var flareDetected by remember { mutableStateOf(false) }
     var confirmReset by rememberSaveable { mutableStateOf(false) }
     var confirmFinish by rememberSaveable { mutableStateOf(false) }
     var showSetSummary by rememberSaveable { mutableStateOf(false) }
@@ -77,15 +79,30 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
         onDispose { lifecycle.lifecycle.removeObserver(observer); viewModel.pause() }
     }
     val p = ui.progress ?: return
-    LaunchedEffect(ui.analysis, p.status, camera.ready, voiceEnabled) {
-        val analysis = ui.analysis
-        val finalSetRep = p.status == SessionStatus.BETWEEN_SETS && analysis?.repetition != null
+    LaunchedEffect(p.status, camera.ready, voiceEnabled) {
+        val finalSetRep = p.status == SessionStatus.BETWEEN_SETS && ui.analysis?.repetition != null
         if (!voiceEnabled || !camera.ready ||
             (p.status !in listOf(SessionStatus.RUNNING, SessionStatus.COMPLETE) && !finalSetRep)) {
             voiceCoach.stop()
             voicePolicy.reset()
-        } else if (analysis != null) {
+        }
+    }
+    LaunchedEffect(ui.analysis, p.status, camera.ready, voiceEnabled) {
+        val analysis = ui.analysis
+        val finalSetRep = p.status == SessionStatus.BETWEEN_SETS && analysis?.repetition != null
+        if (voiceEnabled && camera.ready &&
+            (p.status in listOf(SessionStatus.RUNNING, SessionStatus.COMPLETE) || finalSetRep) &&
+            analysis != null) {
             voicePolicy.observe(analysis)?.let(voiceCoach::speak)
+        }
+    }
+    LaunchedEffect(flareDetected, voiceEnabled, camera.ready) {
+        if (flareDetected && voiceEnabled && camera.ready) {
+            val warning = "Bright light stare detected. Move the camera away from the light."
+            while (true) {
+                voiceCoach.speak(warning)
+                delay(10_000)
+            }
         }
     }
     LaunchedEffect(p.sessionId, p.currentSet, p.status) {
@@ -102,6 +119,7 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
     val instruction = when {
         !hasCamera -> "Allow camera access to monitor your movement"
         !camera.ready -> camera.message
+        flareDetected -> "Bright light flare detected — move the camera away from the light"
         p.status == SessionStatus.SETUP -> monitor.setupGuidance
         p.status == SessionStatus.PAUSED -> "Paused — Resume when you are ready"
         p.status == SessionStatus.BETWEEN_SETS -> "Set complete — press Next Set when ready"
@@ -110,9 +128,10 @@ fun MeasuredWorkoutScreen(exercise: Exercise, viewModel: WorkoutSessionViewModel
     }
     Box(Modifier.fillMaxSize().background(Ink)) {
         if (hasCamera) PoseCamera(Modifier.fillMaxSize(), lens = lens, retry = retry,
-            frameKey = viewModel::key, onBinding = viewModel::bindCamera,
+            frameKey = viewModel::key, onBinding = { epoch -> flareDetected = false; viewModel.bindCamera(epoch) },
             onPose = { viewModel.pose(it.frame) }, onStatus = { camera = it },
-            onTrackingLost = viewModel::trackingLost, onInterrupted = viewModel::pause)
+            onTrackingLost = viewModel::trackingLost, onInterrupted = viewModel::pause,
+            onFlareChanged = { flareDetected = it })
         CameraScrim()
         BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())

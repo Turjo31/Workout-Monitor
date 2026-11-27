@@ -36,7 +36,8 @@ fun PoseCamera(
     lens: Int = CameraSelector.LENS_FACING_FRONT, retry: Int = 0,
     frameKey: (Long, Long) -> FrameKey = { epoch, sequence -> FrameKey("preview", epoch, 0, sequence) },
     onBinding: (Long) -> Unit = {}, onStatus: (PoseCameraStatus) -> Unit = {},
-    onTrackingLost: () -> Unit = {}, onInterrupted: () -> Unit = {}
+    onTrackingLost: () -> Unit = {}, onInterrupted: () -> Unit = {},
+    onFlareChanged: (Boolean) -> Unit = {}
 ) {
     val owner = LocalLifecycleOwner.current
     val context = LocalContext.current
@@ -67,7 +68,8 @@ fun PoseCamera(
     }
     Box(modifier.onSizeChanged { if (size != it && size != IntSize.Zero) interrupted(); size = it }) {
         if (foreground && size.width > 0 && size.height > 0) key(lens, retry, size, rotation) {
-            MountedPoseCamera(lens, frameKey, onPose, onBinding, onStatus, onTrackingLost, onInterrupted)
+            MountedPoseCamera(lens, frameKey, onPose, onBinding, onStatus, onTrackingLost,
+                onInterrupted, onFlareChanged)
         }
     }
 }
@@ -77,7 +79,7 @@ fun PoseCamera(
 private fun MountedPoseCamera(
     lens: Int, frameKey: (Long, Long) -> FrameKey, onPose: (PoseResult) -> Unit,
     onBinding: (Long) -> Unit, onStatus: (PoseCameraStatus) -> Unit,
-    onTrackingLost: () -> Unit, onInterrupted: () -> Unit
+    onTrackingLost: () -> Unit, onInterrupted: () -> Unit, onFlareChanged: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val main = remember(context) { ContextCompat.getMainExecutor(context) }
@@ -100,6 +102,7 @@ private fun MountedPoseCamera(
     val statusCallback by rememberUpdatedState(onStatus)
     val lostCallback by rememberUpdatedState(onTrackingLost)
     val interruptCallback by rememberUpdatedState(onInterrupted)
+    val flareCallback by rememberUpdatedState(onFlareChanged)
     val fail: (String) -> Unit = remember {
         { message ->
             main.execute {
@@ -142,7 +145,11 @@ private fun MountedPoseCamera(
                             }
                         }
                     }
-                }, fail)
+                }, fail, { detected ->
+                    main.execute {
+                        if (active.get() && !failed.get()) flareCallback(detected)
+                    }
+                })
                 // Worker is the only reader/writer used for detection/close.
                 detector.set(created)
                 if (!active.get() || failed.get()) created.close()

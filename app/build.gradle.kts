@@ -85,6 +85,7 @@ dependencies {
 
     // MediaPipe
     implementation("com.google.mediapipe:tasks-vision:1.1.0")
+    implementation("com.google.ai.edge.litert:litert:1.4.2")
 
     // Testing
     testImplementation(libs.junit)

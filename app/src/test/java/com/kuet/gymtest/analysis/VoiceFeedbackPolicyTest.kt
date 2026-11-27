@@ -32,4 +32,18 @@ class VoiceFeedbackPolicyTest {
         assertEquals("Ready. Begin.", policy.observe(squat(100, SquatPhase.STANDING)))
         assertEquals("Ready. Begin.", policy.observe(squat(50, SquatPhase.STANDING, epoch = 2)))
     }
+
+    @Test fun lateralRaiseAndShoulderPressSpeakRepNumberWithoutArmFormNote() {
+        val note = RepAssessment(RepFormQuality.NEEDS_ATTENTION, "Arm position needs attention")
+        val key = FrameKey("session", 1, 1, 1)
+        val lateral = LateralRaiseAnalysisResult(key, 100, 1,
+            RepetitionCompleted(1, 100, note), LateralRaiseFeedback.COUNTED_FORM, true,
+            LateralRaisePhase.LOWERED, null)
+        val press = ShoulderPressAnalysisResult(key.copy(analysisEpoch = 2), 200, 1,
+            RepetitionCompleted(1, 200, note), ShoulderPressFeedback.COUNTED_FORM, true,
+            ShoulderPressPhase.RACKED, null)
+        val policy = VoiceFeedbackPolicy()
+        assertEquals("1.", policy.observe(lateral))
+        assertEquals("1.", policy.observe(press))
+    }
 }
